@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.AiMediaHub" parent="android:Theme.Material.Light.NoActionBar" />
+    <string name="facebook_app_id">1109850424381007</string>
+    <string name="facebook_client_token">c9e95ac9780b1a8c08477a8551183622</string>
+
+
+</resources>
