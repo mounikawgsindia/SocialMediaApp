@@ -1,7 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- company account-->
     <style name="Theme.AiMediaHub" parent="android:Theme.Material.Light.NoActionBar" />
+<!--    <string name="facebook_app_id">1157175713250946</string>-->
+<!--    <string name="facebook_client_token">8ec9183312cb787b953a8b6428b22f7a</string>-->
+<!--    <string name="facebook_secret_key">04f63b558e0932cea6df31a46b876ad6</string>-->
+
+
+    <!-- own account-->
+    <string name="facebook_secret_key">a8d1e54105ae4e089cc97e5d72e4df53</string>
     <string name="facebook_app_id">1109850424381007</string>
     <string name="facebook_client_token">c9e95ac9780b1a8c08477a8551183622</string>
 

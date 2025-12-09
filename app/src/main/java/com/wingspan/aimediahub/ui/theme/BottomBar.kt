@@ -90,9 +90,9 @@ fun BottomBar (navController: NavHostController){
                         color = when (item.route) {
                             "home" ->  Color(0xFF2563EB)
                             "create" -> Color(0xFF22C55E)
-                            "calendar" ->  Color(0xFF22C55E)
-                            "analytics" ->  Color(0xFF8B5CF6)
-                            "profile" -> Color(0xFF60A5FA)
+                            "calendar" ->   Color(0xFF8E24AA)
+                            "analytics" -> Color(0xFF38BDF8)
+                            "profile" -> Color(0xFFFB7185)
                             else -> Color.Gray
                         },
                         fontSize = 12.sp

@@ -2,6 +2,8 @@ package com.wingspan.aimediahub.ui.theme.bottonpages
 
 
 import android.annotation.SuppressLint
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.webkit.CookieManager
 import androidx.compose.foundation.background
@@ -30,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +42,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.os.postDelayed
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
@@ -50,13 +54,18 @@ import com.facebook.FacebookException
 import com.facebook.login.LoginResult
 import com.wingspan.aimediahub.MainActivity
 import com.wingspan.aimediahub.models.SocialAccount
+import com.wingspan.aimediahub.utils.AppTextStyles
+import com.wingspan.aimediahub.utils.Prefs
 import com.wingspan.aimediahub.viewmodel.FacebookViewModel
+import com.wingspan.aimediahub.viewmodel.InstagramViewModel
+
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 @OptIn(ExperimentalEncodingApi::class)
 @SuppressLint("ContextCastToActivity")
 @Composable
-fun HomeScreen(navController: NavHostController, viewModel: FacebookViewModel =hiltViewModel()) {
+fun HomeScreen( bottomNavController: NavHostController,
+                rootNavController: NavHostController, viewModel: FacebookViewModel =hiltViewModel(),instamodel: InstagramViewModel=hiltViewModel()) {
 
 
 
@@ -153,21 +162,19 @@ fun HomeScreen(navController: NavHostController, viewModel: FacebookViewModel =h
                 horizontalArrangement = Arrangement.spacedBy(12.dp)   // small space only
             ) {
                 ActionButton(
-                    title = "Manual Post",
-                    icon = R.drawable.ic_edit,
-                    bgColor = Color(0xFFE3F2FF),
-                    borderColor = Color(0xFF90CAF9),
-                    modifier = Modifier.weight(1f).clickable {
-                        navController.navigate("create")
+                        title = "Manual Post",
+                icon = R.drawable.ic_edit,
+                bgColor = Color(0xFFE3F2FF),
+                borderColor = Color(0xFF90CAF9),
+                modifier = Modifier.weight(1f).clickable {
+                    bottomNavController.navigate("create") {
+                        // optional: avoid multiple copies in back stack
+                        launchSingleTop = true
+                        restoreState = true
+                    }
 
-                        // Call ViewModel function when clicked
-//                        val pageId = "819255231281564"  //mounika page id
-//
-//                        val pageToken = "EAAPxZAzBMjk8BQMI7hDLwR7ZCQjIt0JNCxYVNTPllw4iAjGcaHTPQl9PZC51GesAPVnesEZBsEgV3PAEF99JJGXBjCpji6YyOQqpSFPjLYKoaariZCZCBue6Qxkz7oKvtgWgxOs24TZA2jkLKZAyjdxmOIBtWFOrYf36LSv2WlLluvdTZC6c0Ty1DCHSIuT8q8HFstZCyebybq"
-//                        val message = "Hello! Manual post from Android app 113😎"
-//                        viewModel.postToFacebook(pageId, pageToken, message)
 
-                    }   // Equal width
+                }   // Equal width
 
                 )
                 ActionButton(
@@ -313,11 +320,12 @@ fun ActionButton(title: String, icon: Int,
 @SuppressLint("ContextCastToActivity")
 @Composable
 fun ConnectedAccountsSection(
-    viewModel: FacebookViewModel = hiltViewModel()
+    viewModel: FacebookViewModel = hiltViewModel(),instamodel: InstagramViewModel=hiltViewModel()
 ) {
     val fbConnected = viewModel.fbConnected.collectAsState()
     val fbPageImage = viewModel.fbPageImage.collectAsState()
-
+    var context=LocalContext.current
+    val prefs = remember { Prefs(context) }
     // Define all social platforms
     val allAccounts = listOf(
         SocialAccount("Facebook", fbConnected.value, fbPageImage.value, "fbToken"),
@@ -347,6 +355,12 @@ fun ConnectedAccountsSection(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xFFE7F0FF))
+                            .clickable{
+                                if (account.platform == "Facebook") {
+                                    logoutFacebook()
+                                    viewModel.setFbDisconnected()
+                                }
+                            }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         // Social icon fully colored for Facebook
@@ -389,13 +403,17 @@ fun ConnectedAccountsSection(
                             // Start login/connect flow
                             if (account.platform == "Facebook") {
 
-
-
-                               // logoutFacebook()
+                                // logoutFacebook()
 
                                 LoginManager.getInstance().logInWithReadPermissions(
                                     activity,
-                                    listOf("public_profile", "email", "pages_manage_posts", "pages_read_engagement")
+                                    listOf(
+                                        "public_profile",
+                                        "email",
+                                        "pages_show_list",
+                                        "pages_manage_posts",
+                                        "pages_read_engagement"
+                                    )
                                 )
                                 // Register callback once
                                 LoginManager.getInstance().registerCallback(
@@ -404,14 +422,36 @@ fun ConnectedAccountsSection(
                                         override fun onSuccess(result: LoginResult) {
 
                                             Log.d("FB_LOGIN", "Login success callback hit")
+                                            val permissions = result.accessToken?.permissions ?: emptySet()
+                                            Log.d("FB_LOGIN", "Permissions = $permissions")
 
+                                            // ✅ Request publish only if missing
+                                            if (!permissions.contains("pages_manage_posts")) {
+
+                                                // ❗IMPORTANT: delay helps avoid Facebook SDK crash
+                                                Handler(Looper.getMainLooper()).postDelayed({
+
+                                                    LoginManager.getInstance().logInWithPublishPermissions(
+                                                        activity,
+                                                        listOf("pages_manage_posts")
+                                                    )
+
+                                                }, 800)
+
+                                                return
+                                            }
                                             val token = result.accessToken?.token
 
                                             //get longlikev token and call getfbpages fun in viewmodel
+                                            //own account
                                             viewModel.getLongLiveToken("1109850424381007","a8d1e54105ae4e089cc97e5d72e4df53",
                                                 token.toString()
                                             )
 
+                                            //company account
+//                                            viewModel.getLongLiveToken("1157175713250946","04f63b558e0932cea6df31a46b876ad6",
+//                                                token.toString()
+//                                            )
 
                                             Log.d("FB_LOGIN", "Token = $token")
                                         }
@@ -427,6 +467,12 @@ fun ConnectedAccountsSection(
 
 
                                 //viewModel.getfbResponse()
+                            }
+                            if(account.platform=="Instagram"){
+                                val shortToken = "IGAATWB2zHKD1BZAGJNbS1MTUZAUSVVlLTVOM1FoWXh4MWZAKN3dKTzI1TXdzclByMFdLZAXAzVkg2Ym5xOS1SOG8tMUZAjVXpwX2NCY2p3YmpTMVNXWGowdHM0R0RIX3pLSzJIeHRaYTNxa1pIbmE2LXV1dlBtWEVGS2lkclJNOWRQNAZDZD"
+
+
+
                             }
                         }
                     )

@@ -15,6 +15,7 @@ import com.wingspan.aimediahub.ui.theme.textColor
 
 object AppTextStyles {
 
+    var  facebook_client_key="8ec9183312cb787b953a8b6428b22f7a"
     val MainHeadingPrimary = TextStyle(
         fontSize = 22.sp,
         fontWeight = FontWeight.Bold,

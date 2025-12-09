@@ -20,7 +20,18 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-
+    signingConfigs {
+        create("release") {
+            val keystorePath = project.findProperty("KEYSTORE_FILE") as? String ?: "aimedia.jks"
+            val storePassword = project.findProperty("KEYSTORE_PASSWORD") as? String ?: ""
+            val keyAlias = project.findProperty("KEY_ALIAS") as? String ?: ""
+            val keyPassword = project.findProperty("KEY_PASSWORD") as? String ?: ""
+            storeFile = file(keystorePath)
+            this.storePassword = storePassword
+            this.keyAlias = keyAlias
+            this.keyPassword = keyPassword
+        }
+    }
     buildTypes {
         debug {
 
@@ -29,6 +40,8 @@ android {
             buildConfigField("String", "BASE_URL", "\"${project.properties["BASE_URL"]}\"")
         }
         release {
+
+            signingConfig= signingConfigs.getByName("release")
             buildConfigField("boolean", "ENABLE_LOG", "false") // 👈 Enable logging
             buildConfigField("String", "BASE_URL", "\"${project.properties["BASE_URL"]}\"")
             isMinifyEnabled = false

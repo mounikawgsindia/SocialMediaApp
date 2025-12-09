@@ -19,6 +19,8 @@ import com.wingspan.aimediahub.models.OnBoardModel
 import com.wingspan.aimediahub.ui.theme.AiMediaHubTheme
 import com.wingspan.aimediahub.ui.theme.AppNavigation
 import com.wingspan.aimediahub.ui.theme.AutoOnBoardScreen
+import com.wingspan.aimediahub.ui.theme.CreatePostScreen
+import com.wingspan.aimediahub.ui.theme.DayScreen
 import com.wingspan.aimediahub.ui.theme.LoginScreen
 import com.wingspan.aimediahub.ui.theme.RegistrationScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -54,7 +56,7 @@ class MainActivity : ComponentActivity() {
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MainApp() {
-    val navController = rememberNavController()
+    val rootNavController = rememberNavController() // root navController
     val onBoardList = listOf(
         OnBoardModel(
             image = R.drawable.onb5,
@@ -73,35 +75,38 @@ fun MainApp() {
         )
     )
 
-    NavHost(navController=navController, startDestination = "main"){
+    NavHost(navController=rootNavController, startDestination = "main"){
     //onboarding screen
         composable("onboarding") {
             AutoOnBoardScreen(
                 onBoardList = onBoardList,
-                onSkip = { navController.navigate("login") },
-                onFinish = { navController.navigate("login") }
+                onSkip = { rootNavController.navigate("login") },
+                onFinish = { rootNavController.navigate("login") }
             )
         }
         // LOGIN SCREEN
         composable("login") {
-            LoginScreen(navController)
+            LoginScreen(rootNavController)
         }
 
         // registration
         composable("registration") {
-            RegistrationScreen(navController)
+            RegistrationScreen(rootNavController)
         }
 
         // ✅ Main App Screen (Bottom Nav starts here)
         composable("main") {
-            AppNavigation()
+            AppNavigation(rootNavController)
+        }
+        // ✅ Full-screen Create Post page (outside Bottom Navigation)
+        composable("create_post_screen") {
+            CreatePostScreen(rootNavController)
         }
 
-//
-//        //homescreen
-//        composable("homescreen") {
-//            HomeScreen(navController)
-//        }
+        composable("dayscreen") {
+            DayScreen(rootNavController)
+        }
+
 
 
     }

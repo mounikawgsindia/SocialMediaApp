@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.wingspan.aimediahub.utils.BottomNavItem
 import androidx.navigation.compose.NavHost
@@ -17,25 +18,42 @@ import com.wingspan.aimediahub.ui.theme.bottonpages.ProfileScreen
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun AppNavigation() {
+fun AppNavigation(rootNavController: NavHostController) {
 
-    val navController = rememberNavController()
+    val childNavController  = rememberNavController()
 
     Scaffold(
-        bottomBar = { BottomBar(navController) }
+        bottomBar = { BottomBar(childNavController) }
     ) { paddingValues ->
 
         NavHost(
-            navController = navController,
+            navController = childNavController,
             startDestination = BottomNavItem.Home.route,
             modifier = Modifier.padding(paddingValues)
         ) {
-
-            composable("home") { HomeScreen(navController) }
-            composable("create") { CreateScreen(navController) }
-            composable("calendar") { CalendarScreen() }
-            composable("analytics") { AnalyticsScreen() }
-            composable("profile") { ProfileScreen() }
+            // Pass both NavControllers to bottom nav screens
+            composable(BottomNavItem.Home.route) {
+                HomeScreen(
+                    bottomNavController = childNavController,
+                    rootNavController = rootNavController
+                )
+            }
+            composable(BottomNavItem.Create.route) {
+                CreateScreen(
+                    bottomNavController = childNavController,
+                    rootNavController = rootNavController
+                )
+            }
+            composable(BottomNavItem.Calendar.route) {
+                CalendarScreen()
+            }
+            composable(BottomNavItem.Analytics.route) {
+                AnalyticsScreen()
+            }
+            composable(BottomNavItem.Profile.route) {
+                ProfileScreen()
+            }
         }
     }
+
 }

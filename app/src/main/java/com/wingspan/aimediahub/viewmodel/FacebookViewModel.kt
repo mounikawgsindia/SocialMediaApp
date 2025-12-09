@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class FacebookViewModel @Inject constructor(var repository:FacebookRepository ,private val prefs: Prefs): ViewModel() {
+class FacebookViewModel @Inject constructor(var repository:FacebookRepository , var prefs: Prefs): ViewModel() {
 
 
     private val _accounts = MutableStateFlow<List<SocialAccount>>(emptyList())
@@ -43,6 +43,7 @@ class FacebookViewModel @Inject constructor(var repository:FacebookRepository ,p
     }
 
     fun postToFacebook(pageId: String, pageToken: String, message: String) {
+        Log.d("FB_POST", "data: pageId  ${pageId}...pageToken ${pageToken}...messGE...${message}")
         viewModelScope.launch {
             try {
                 val response = repository.postMessage(pageId, message, pageToken)
@@ -69,10 +70,12 @@ class FacebookViewModel @Inject constructor(var repository:FacebookRepository ,p
 
 
                     pages.forEach { page ->
+                        Log.d("FB_PAGE","pages : ${page}")
                         Log.d("FB_PAGE", "Page: ${page.name}, ID: ${page.id}, Token: ${page.access_token}, Image: ${page.picture?.data?.url}")
-                        prefs.saveFacebookData(page.id, page.picture?.data?.url.toString(), page.id)
+                        prefs.saveFacebookData(page.id, page.picture?.data?.url.toString(),page.access_token.toString())
                     }
                 } else {
+                    Log.d("FB_PAGE","pages : ${pages}...${response}")
                     _fbConnected.value = false
                     _fbPageImage.value = null
                 }
@@ -106,5 +109,12 @@ class FacebookViewModel @Inject constructor(var repository:FacebookRepository ,p
                 Log.e("FB_PAGE", "Error: ${response.errorBody()?.string()}")
             }
         }
+    }
+
+
+    fun setFbDisconnected() {
+        _fbConnected.value = false
+        _fbPageImage.value = ""
+        prefs.clearFacebookData() // if you're saving token/page id
     }
 }

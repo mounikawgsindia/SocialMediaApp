@@ -20,7 +20,7 @@ interface FacebookApi {
 // facebook pages data
     @GET("me/accounts")
     suspend fun getPages(
-        @Query("fields") fields: String = "id,name,picture.type(large)",
+        @Query("fields") fields: String = "id,name,access_token,picture.type(large)",
         @Query("access_token") userToken: String
     ): Response<PageResponse>
 

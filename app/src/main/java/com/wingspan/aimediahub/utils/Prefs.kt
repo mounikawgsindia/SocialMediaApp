@@ -16,11 +16,11 @@ class Prefs @Inject constructor(@ApplicationContext context: Context) {
     }
 
     // ----------------- Save all Facebook data -----------------
-    fun saveFacebookData(pageId: String, pageImage: String, longToken: String) {
+    fun saveFacebookData(pageId: String, pageImage: String, access_token: String) {
         prefs.edit().apply {
             putString("FB_PAGE_ID", pageId)
             putString("FB_PAGE_IMAGE", pageImage)
-            putString("FB_page_token", longToken)
+            putString("FB_page_token",access_token)
             apply()
         }
     }

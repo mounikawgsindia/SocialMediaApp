@@ -13,6 +13,8 @@ import javax.inject.Singleton
 object NetworkModule {
 
     private const val BASE_URL = "https://graph.facebook.com/v19.0/"
+    private const val INSTAGRAM_BASE_URL = "https://graph.instagram.com/"
+
 
     @Provides
     @Singleton
@@ -28,5 +30,23 @@ object NetworkModule {
     @Singleton
     fun provideFacebookApi( @Named("Facebook")retrofit: Retrofit): FacebookApi {
         return retrofit.create(FacebookApi::class.java)
+    }
+
+
+    // ------------------ Instagram ------------------
+    @Provides
+    @Singleton
+    @Named("Instagram")
+    fun provideInstagramRetrofit(): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(INSTAGRAM_BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideInstagramApi(@Named("Instagram") retrofit: Retrofit): InstagramApi {
+        return retrofit.create(InstagramApi::class.java)
     }
 }
