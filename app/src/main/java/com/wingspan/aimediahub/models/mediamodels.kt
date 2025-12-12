@@ -1,6 +1,5 @@
 package com.wingspan.aimediahub.models
 
-import android.graphics.Picture
 import androidx.compose.ui.graphics.Color
 import com.google.gson.annotations.SerializedName
 
@@ -12,6 +11,10 @@ data class OnBoardModel(
 data class LoginRequest(var email:String?,var password:String?)
 data class ResponseData(var message:String?,var error:String?, var success:Boolean)
 data class PageResponse( val data: List<PageItem>)
+data class FacebookPostResponse(
+    val id: String
+)
+
 data class PageItem(
     val id: String,
     val name: String,
@@ -31,8 +34,16 @@ data class SocialAccount(
     val connected: Boolean = false,
     val imageUrl: String? = null,
     val accessToken: String? = null, // store token for connected accounts
+    val showDisconnectOnly: Boolean = false
 )
-
+data class SocialAccount1(
+    val id: String,           // Facebook Page ID
+    val name: String,         // Page name
+    val accessToken: String,  // Page access token
+    val imageUrl: String?,
+   val platform:String?
+    // Page profile image URL
+)
 // ---------- Sample data models ----------
 data class ScheduledPost(
     val id: Int,
@@ -56,7 +67,8 @@ data class LongLivedTokenResponse(
 data class InstagramUserResponse(
     val id: String,
     val username: String,
-    val account_type: String
+    val account_type: String,
+    val profile_picture_url:String,var followers_count:String,var follows_count :String,var media_count:String
 )
 
 // User media/posts
@@ -83,4 +95,24 @@ data class InstagramBusinessResponse(
 data class InstagramBusinessAccount(
     @SerializedName("id")
     val id: String
+)
+data class TweetRequest(
+    val text: String,
+    val media: MediaRequest? = null
+)
+data class MediaRequest(
+    val media_ids: List<String>
+)
+
+data class TweetResponse(
+    val data: String?
+)
+
+data class TweetData(
+    val id: String,
+    val text: String
+)
+data class ApiResponse(
+    val success: Boolean,
+    val message: String?
 )

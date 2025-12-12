@@ -1,11 +1,14 @@
 package com.wingspan.aimediahub.ui.theme
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,12 +21,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -40,6 +43,8 @@ import java.util.Locale
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,25 +52,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
 import com.wingspan.aimediahub.models.ScheduledPost
 import com.wingspan.aimediahub.R
+import com.wingspan.aimediahub.models.SocialAccount1
 import com.wingspan.aimediahub.utils.Prefs
 import com.wingspan.aimediahub.viewmodel.FacebookViewModel
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+@SuppressLint("MutableCollectionMutableState")
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -76,6 +82,33 @@ fun CreatePostScreen(navController: NavHostController,viewModel: FacebookViewMod
     var postText by remember { mutableStateOf("") }
     var context= LocalContext.current
     val prefs = remember { Prefs(context) }
+    var currentfbPages by remember { mutableStateOf(prefs.getFacebookPages().toMutableList()) }
+    var twitterProfile by remember {mutableStateOf(prefs.getTwitterAccount())}
+    var instaProfile by remember {mutableStateOf(prefs.getInstaAccount())}
+
+    val postfbId by viewModel.fbpostStatus.collectAsState()
+    val postTwitterId by viewModel.twitterpostStatus.collectAsState()
+
+    LaunchedEffect(postfbId) {
+        if (!postfbId.isNullOrEmpty()) {
+            Toast.makeText(
+                context,
+                "Facebook Post successfully",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+        postText=""
+    }
+    LaunchedEffect(postTwitterId) {
+        if (!postTwitterId.isNullOrEmpty()) {
+            Toast.makeText(
+                context,
+                "Twitter Post successfully",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+        postText=""
+    }
 
     // ✅ Image Picker Launcher
     val imagePickerLauncher =
@@ -103,18 +136,50 @@ fun CreatePostScreen(navController: NavHostController,viewModel: FacebookViewMod
         NewPostTopBar(
             onClose = { navController.popBackStack() },
             onContinue = {
+                val message = postText
+                if(!message.isEmpty()){
+                    if (currentfbPages.isNotEmpty()) {
+                        currentfbPages.forEach { page ->
 
+                            viewModel.postToFacebook(
+                                pageId = page.id,
+                                pageToken = page.accessToken,
+                                message = message
+                            )
 
-                        val pageToken = "EAAPxZAzBMjk8BQMI7hDLwR7ZCQjIt0JNCxYVNTPllw4iAjGcaHTPQl9PZC51GesAPVnesEZBsEgV3PAEF99JJGXBjCpji6YyOQqpSFPjLYKoaariZCZCBue6Qxkz7oKvtgWgxOs24TZA2jkLKZAyjdxmOIBtWFOrYf36LSv2WlLluvdTZC6c0Ty1DCHSIuT8q8HFstZCyebybq"
-                        val message = postText
-                val pageId = "819255231281564"
-                        viewModel.postToFacebook(prefs.getFbPageId().toString(), prefs.getfbpageToken().toString(), message)
-                //viewModel.postToFacebook(prefs.getFbPageId().toString(), prefs.getLongToken().toString(), message)
+                        }
+
+                    }
+                    if(twitterProfile!=null){
+                        var accessToken="1998625018910326784-B4LG6Zus5ZZp5VcdQJxMmnWGkldIWb"
+                        viewModel.postTweet(accessToken,"5f05HDr3SA95rnegFQjqwCJeJAafq4bcW4G2zT6nyvyUy",message)
+                    }
+                    if(instaProfile!=null){
+                        val longlivedToken = "IGAATWB2zHKD1BZAGJlYUp2akY1TG1fa3pUeU80MUJHbC1XNFY5aWRabWdEaV9RRDZATbDRkeDNEa0NET19JR0dkSkNReTZARYjhVMnhqU1NkYVB2VUNGZAjZAXUHFEcEs4WXVhcjRqTkJJYXJGQTlvb2Y1dlBtbnpIdjdWbnRMY1RXawZDZD"
+                        viewModel.fetchUserMedia(longlivedToken)
+                    }
+                    if(!currentfbPages.isNotEmpty() && twitterProfile==null && instaProfile==null) {
+                        Toast.makeText(context, "No profiles connected", Toast.LENGTH_SHORT).show()
+                    }
+                }else{
+                    Toast.makeText(context, "No Message to continue", Toast.LENGTH_SHORT).show()
+                }
+
             }
         )
 
         // ✅ DATE & PLATFORM ROW
-        DateAndPlatformRow()
+        DateAndPlatformRow(
+            currentPages = currentfbPages,twitterPage=twitterProfile,instagramPage=instaProfile,
+            onPagesChange = { updatedList ->
+                currentfbPages = updatedList
+            }, context = context,
+            onRemoveTwitter = {
+                twitterProfile = null
+            },onRemoveInstagram={
+                instaProfile=null
+            }
+        )
 
         Divider(color = Color(0xFFE0E0E0))
 
@@ -240,47 +305,159 @@ fun NewPostTopBar(
 }
 
 
+
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun DateAndPlatformRow() {
+fun DateAndPlatformRow(
+    currentPages: MutableList<SocialAccount1>,
+    onPagesChange: (MutableList<SocialAccount1>) -> Unit,
+    twitterPage: SocialAccount1?,instagramPage :SocialAccount1?,
+    context: Context, onRemoveTwitter: () -> Unit,onRemoveInstagram:()-> Unit
+
+) {
 
     val currentDateTime = LocalDateTime.now()
     val formatter = DateTimeFormatter.ofPattern("MMM d, yyyy  h:mm a", Locale.ENGLISH)
     val formattedDate = currentDateTime.format(formatter)
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(14.dp)
     ) {
 
+        // ---------------------- DATE ----------------------
         Box(
             modifier = Modifier
                 .background(Color.White, RoundedCornerShape(8.dp))
                 .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
                 .padding(horizontal = 14.dp, vertical = 6.dp)
         ) {
-            Text(formattedDate, fontWeight = FontWeight.Medium)
+            Text(text = formattedDate, fontWeight = FontWeight.Medium)
         }
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(12.dp))
 
-        Box(
-            modifier = Modifier
-                .background(Color.White, RoundedCornerShape(12.dp))
-                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
-                .padding(10.dp)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
+
+            // ---------- FACEBOOK PAGES ----------
+            items(currentPages.size) { index ->
+                var page =currentPages[index]
+                SocialChip(
+                    icon = R.drawable.ic_fb,
+                    iconTint = Color(0xFF1877F2),
+                    imageUrl = page.imageUrl,
+                    label = page.name,
+                    onRemove = {
+                        val updated = currentPages.filter { it.id != page.id }.toMutableList()
+                        onPagesChange(updated)
+                    }
+                )
+            }
+
+            // ---------- TWITTER ----------
+            twitterPage?.let { tp ->
+                item {
+                    SocialChip(
+                        icon = R.drawable.ic_twitter,
+                        iconTint = Color(0xFF1DA1F2),
+                        imageUrl = tp.imageUrl,
+                        label = tp.name,
+                        onRemove = {
+                            onRemoveTwitter()
+                        }
+                    )
+                }
+            }
+
+            // ---------- INSTAGRAM ----------
+            instagramPage?.let { ip ->
+                item {
+                    SocialChip(
+                        icon = R.drawable.ic_instagram,
+                        iconTint = Color(0xFFDD2A7B), // IG color
+                        imageUrl = ip.imageUrl,
+                        label = ip.name,
+                        onRemove = {
+                            onRemoveInstagram()
+                        }
+                    )
+                }
+            }
+        }
+
+    }
+}
+
+
+@Composable
+fun SocialChip(
+    @DrawableRes icon: Int,
+    iconTint: Color,
+    imageUrl: String?,
+    label: String,
+    onRemove: () -> Unit
+) {
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFE7F0FF))
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+
+            // Platform Icon
             Icon(
-                painter = painterResource(R.drawable.ic_fb),
-                contentDescription = "Facebook",
-                tint = Color.Unspecified,
-                modifier = Modifier.size(24.dp)
+                painter = painterResource(id = icon),
+                contentDescription = label,
+                tint = iconTint,
+                modifier = Modifier.size(36.dp)
             )
+
+            Spacer(Modifier.width(10.dp))
+
+            // Profile Image + Close Button
+            Box(modifier = Modifier.size(34.dp)) {
+
+                if (!imageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = label,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                    )
+                }
+
+                // ----------- BEAUTIFUL MODERN CROSS BUTTON -----------
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .align(Alignment.TopEnd)
+                        .offset(x = 6.dp, y = (-6).dp)
+                        .background(Color.Black, CircleShape)
+                        .shadow(4.dp, CircleShape)
+                        .clickable { onRemove() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_close),
+                        contentDescription = "Remove",
+                        tint = Color.White,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+            }
         }
     }
 }
+
+
 
 @Composable
 fun PostContentSection(    text: String,

@@ -70,6 +70,10 @@ dependencies {
     //coil
     implementation ("io.coil-kt:coil-compose:2.4.0")
 
+    //twitter
+    implementation(libs.scribejava.core.v833)
+    implementation(libs.scribejava.apis.v833)
+    implementation(libs.gson)
     //facebook
     implementation(libs.facebook.android.sdk)
     //retrofit

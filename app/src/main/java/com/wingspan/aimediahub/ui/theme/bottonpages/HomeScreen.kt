@@ -5,7 +5,6 @@ import android.annotation.SuppressLint
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.webkit.CookieManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,9 +24,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +45,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.os.postDelayed
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
@@ -54,11 +56,9 @@ import com.facebook.FacebookException
 import com.facebook.login.LoginResult
 import com.wingspan.aimediahub.MainActivity
 import com.wingspan.aimediahub.models.SocialAccount
-import com.wingspan.aimediahub.utils.AppTextStyles
 import com.wingspan.aimediahub.utils.Prefs
 import com.wingspan.aimediahub.viewmodel.FacebookViewModel
 import com.wingspan.aimediahub.viewmodel.InstagramViewModel
-
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 @OptIn(ExperimentalEncodingApi::class)
@@ -67,7 +67,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 fun HomeScreen( bottomNavController: NavHostController,
                 rootNavController: NavHostController, viewModel: FacebookViewModel =hiltViewModel(),instamodel: InstagramViewModel=hiltViewModel()) {
 
-
+    var context= LocalContext.current
+    val prefs = remember { Prefs(context) }
 
 
     Box(
@@ -97,21 +98,14 @@ fun HomeScreen( bottomNavController: NavHostController,
                     style = MainHeadingBlack
                 )
 
-                Text(
-                    text = "Logout",
-                    style = MainHeadingBlack,
-                    modifier = Modifier.clickable {
-                        logoutFacebook()
 
-                    }
-                )
             }
 
             Spacer(Modifier.height(20.dp))
 
             // ---------------- CONNECTED & NON-CONNECTED ACCOUNTS ----------------
             Spacer(Modifier.height(20.dp))
-            ConnectedAccountsSection(viewModel)
+            ConnectedAccountsSection(viewModel,prefs)
             Spacer(Modifier.height(25.dp))
 
 
@@ -191,60 +185,80 @@ fun HomeScreen( bottomNavController: NavHostController,
     }
 
 }
-fun logoutFacebook() {
-    // 1️⃣ Clear SDK token & session
-    LoginManager.getInstance().logOut()
 
-    // 2️⃣ Clear WebView cookies (used by Facebook Login)
-    CookieManager.getInstance().removeAllCookies(null)
-    CookieManager.getInstance().flush()
-
-    Log.d("FB_LOGOUT", "User logged out completely")
-}
 
 
 @Composable
 fun SocialIcon(
     icon: Int,
     label: String,
-    connected: Boolean = false,
-    imageUrl: String? = null,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit = {}
+    connected: Boolean,
+    showDisconnectOnly: Boolean = false,
+    onConnectClick: () -> Unit,    // ✅ Only connect
+    onDisconnectClick: () -> Unit // ✅ Only disconnect
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier.clickable { onClick() }) {
-        Box {
-            if (connected && imageUrl != null) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = label,
-                    modifier = Modifier.size(50.dp).clip(RoundedCornerShape(10.dp))
-                )
-            } else {
-                Icon(
-                    painter = painterResource(id = icon),
-                    contentDescription = label,
-                    tint = if (connected) Color.Unspecified else Color.Gray,
-                    modifier = Modifier.size(30.dp)
-                )
+    Box(
+        modifier = Modifier
+            .size(50.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFFF5F5F5))
+            .clickable(enabled = !connected) {  // ✅ DISABLED WHEN CONNECTED
+                onConnectClick()
             }
+            .padding(8.dp)
+    ) {
 
-            // Small tick if connected
-            if (connected) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+
+            Icon(
+                painter = painterResource(id = icon),
+                contentDescription = label,
+                tint = when {
+                    showDisconnectOnly -> Color(0xFF1877F2) // blue
+                    connected -> Color(0xFF1877F2)
+                    else -> Color(0xFF9E9E9E) // grey
+                },
+                modifier = Modifier.size(36.dp)
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (connected || showDisconnectOnly) Color.Black else Color(0xFF9E9E9E)
+            )
+        }
+
+        // ✅ ❌ Disconnect Badge
+        if (showDisconnectOnly) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(Color.Red)
+                    .clickable {
+                        onDisconnectClick()  // ✅ ONLY ❌ disconnects
+                    },
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_tick), // small green tick icon
-                    contentDescription = "Connected",
-                    tint = Color(0xFF34A853),
-                    modifier = Modifier.size(16.dp).align(Alignment.TopEnd)
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Disconnect",
+                    tint = Color.White,
+                    modifier = Modifier.size(12.dp)
                 )
             }
         }
-
-        Spacer(Modifier.height(4.dp))
-
-        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
+
 
 
 
@@ -320,52 +334,141 @@ fun ActionButton(title: String, icon: Int,
 @SuppressLint("ContextCastToActivity")
 @Composable
 fun ConnectedAccountsSection(
-    viewModel: FacebookViewModel = hiltViewModel(),instamodel: InstagramViewModel=hiltViewModel()
+    viewModel: FacebookViewModel = hiltViewModel(),
+    prefs: Prefs
 ) {
-    val fbConnected = viewModel.fbConnected.collectAsState()
-    val fbPageImage = viewModel.fbPageImage.collectAsState()
-    var context=LocalContext.current
-    val prefs = remember { Prefs(context) }
-    // Define all social platforms
-    val allAccounts = listOf(
-        SocialAccount("Facebook", fbConnected.value, fbPageImage.value, "fbToken"),
-        SocialAccount("Instagram"),
-        SocialAccount("LinkedIn"),
-        SocialAccount("Twitter"),
-        SocialAccount("YouTube")
-    )
+
+    val accounts = viewModel.facebookaccounts.collectAsState()
+    val twitterData=viewModel.twitterProfile.collectAsState()
+    val instagramData =viewModel.instaProfile.collectAsState()
+
+
+    Log.d("data","---${accounts}....${twitterData}")
     val activity = LocalContext.current as MainActivity
     val callbackManager = activity.callbackManager
-    val connectedAccounts = allAccounts.filter { it.connected }
-    val nonConnectedAccounts = allAccounts.filter { !it.connected }
+
+    // ---------------- CREATE LIST OF ACCOUNTS ----------------
+    // Facebook pages -> multiple connected accounts
+
+    var facebookAccounts = accounts.value.map { page ->
+        SocialAccount(
+            platform = "Facebook",
+            connected = true,
+            imageUrl = page.imageUrl,
+            accessToken = page.accessToken
+        )
+    }
+    val twitterAccount = twitterData.value?.let {
+        Log.d("data","---${it.accessToken}....${it.imageUrl}")
+        SocialAccount(
+            platform = "Twitter",
+            connected = true,
+            imageUrl = it.imageUrl,
+            accessToken = it.accessToken
+        )
+    }
+    val instagramAccount = instagramData.value?.let {
+        Log.d("data","---${it.accessToken}....${it.imageUrl}")
+        SocialAccount(
+            platform = "Instagram",
+            connected = true,
+            imageUrl = it.imageUrl,
+            accessToken = it.accessToken
+        )
+    }
+
+
+    // 2️⃣ If no pages exist, show a placeholder to allow connection
+    val facebookDisconnectOnly = if (facebookAccounts.isNotEmpty()) {
+        listOf(
+            SocialAccount(
+                platform = "Facebook",
+                connected = true,
+                showDisconnectOnly = true // ✅ special behavior
+            )
+        )
+    } else {
+        listOf(
+            SocialAccount(
+                platform = "Facebook",
+                connected = false
+            )
+        )
+    }
+
+    val twitterDisconnectOnly = if (twitterAccount!= null) {
+        listOf(
+            SocialAccount(
+                platform = "Twitter",
+                connected = true,
+                showDisconnectOnly = true // ✅ special behavior
+            )
+        )
+    } else {
+        listOf(
+            SocialAccount(
+                platform = "Twitter",
+                connected = false
+            )
+        )
+    }
+
+    val instaDisconnectOnly = if (instagramAccount!= null) {
+        listOf(
+            SocialAccount(
+                platform = "Instagram",
+                connected = true,
+                showDisconnectOnly = true // ✅ special behavior
+            )
+        )
+    } else {
+        listOf(
+            SocialAccount(
+                platform = "Instagram",
+                connected = false
+            )
+        )
+    }
+    // Other social accounts (single entry)
+
+    var otherAccounts = listOf(
+        SocialAccount("LinkedIn"),
+        SocialAccount("YouTube")
+    )
+
+    val connectedAccounts = facebookAccounts +
+            listOfNotNull(twitterAccount)+
+            listOfNotNull(instagramAccount)
+
+    val nonConnectedAccounts = facebookDisconnectOnly +twitterDisconnectOnly+instaDisconnectOnly+ otherAccounts
+
 
     Column(modifier = Modifier.fillMaxWidth()) {
         // ---------------- CONNECTED ----------------
         if (connectedAccounts.isNotEmpty()) {
+
+            Log.d("connected fb","---${connectedAccounts}")
             Text(
                 "Connected Accounts",
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 16.sp
             )
             Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                connectedAccounts.forEach { account ->
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(connectedAccounts.size) { index ->
+                    var account = connectedAccounts[index]
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xFFE7F0FF))
-                            .clickable{
-                                if (account.platform == "Facebook") {
-                                    logoutFacebook()
-                                    viewModel.setFbDisconnected()
-                                }
-                            }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        // Social icon fully colored for Facebook
                         Icon(
-                            painter = painterResource(id = getIcon(account.platform)),
+                            painter = painterResource(id = getIcon(account.platform ?: "")),
                             contentDescription = account.platform,
                             tint = if (account.platform.lowercase() == "facebook") Color(0xFF1877F2) else Color.Unspecified,
                             modifier = Modifier.size(40.dp)
@@ -373,19 +476,19 @@ fun ConnectedAccountsSection(
 
                         Spacer(Modifier.width(8.dp))
 
-                        // Show page image on the right side if exists
                         if (!account.imageUrl.isNullOrEmpty()) {
                             AsyncImage(
                                 model = account.imageUrl,
                                 contentDescription = account.platform,
                                 modifier = Modifier
                                     .size(30.dp)
-                                    .clip(RoundedCornerShape(15.dp))
+                                    .clip(CircleShape)
                             )
                         }
                     }
                 }
             }
+
         }
         Spacer(Modifier.height(16.dp))
 
@@ -399,11 +502,20 @@ fun ConnectedAccountsSection(
                         icon = getIcon(account.platform),
                         label = account.platform,
                         connected = false,
-                        onClick = {
+                        showDisconnectOnly =account.showDisconnectOnly ,
+                        onDisconnectClick = {
+                            // ✅ ONLY for connected ❌
+                            if (account.platform == "Facebook") {
+                                logoutFacebook(viewModel)
+                            }else if(account.platform == "Twitter"){
+                                logoutTwitter(viewModel)
+                            }else if(account.platform=="Instagram"){
+                                logoutInstagram(viewModel)
+                            }
+                        },
+                        onConnectClick = {
                             // Start login/connect flow
                             if (account.platform == "Facebook") {
-
-                                // logoutFacebook()
 
                                 LoginManager.getInstance().logInWithReadPermissions(
                                     activity,
@@ -469,10 +581,14 @@ fun ConnectedAccountsSection(
                                 //viewModel.getfbResponse()
                             }
                             if(account.platform=="Instagram"){
-                                val shortToken = "IGAATWB2zHKD1BZAGJNbS1MTUZAUSVVlLTVOM1FoWXh4MWZAKN3dKTzI1TXdzclByMFdLZAXAzVkg2Ym5xOS1SOG8tMUZAjVXpwX2NCY2p3YmpTMVNXWGowdHM0R0RIX3pLSzJIeHRaYTNxa1pIbmE2LXV1dlBtWEVGS2lkclJNOWRQNAZDZD"
+                                //i get this from get token instagram
+                                val longlivedToken = "IGAATWB2zHKD1BZAGJlYUp2akY1TG1fa3pUeU80MUJHbC1XNFY5aWRabWdEaV9RRDZATbDRkeDNEa0NET19JR0dkSkNReTZARYjhVMnhqU1NkYVB2VUNGZAjZAXUHFEcEs4WXVhcjRqTkJJYXJGQTlvb2Y1dlBtbnpIdjdWbnRMY1RXawZDZD"
+                                viewModel.fetchUserProfileInsta(longlivedToken)
 
 
-
+                            }
+                            if(account.platform=="Twitter"){
+                                viewModel.fetchUserProfile("1998625018910326784-B4LG6Zus5ZZp5VcdQJxMmnWGkldIWb","5f05HDr3SA95rnegFQjqwCJeJAafq4bcW4G2zT6nyvyUy")
                             }
                         }
                     )
@@ -492,7 +608,19 @@ fun getIcon(platform: String): Int {
     }
 }
 
+fun logoutFacebook(viewModel: FacebookViewModel) {
+    LoginManager.getInstance().logOut()
 
+    viewModel.setFbDisconnected()      // ✅ clears UI instantly
+
+    Log.d("FB_LOGOUT", "All Facebook accounts cleared")
+}
+fun logoutTwitter(viewModel: FacebookViewModel){
+    viewModel.setTwitterDisconnected()
+}
+fun logoutInstagram(viewModel: FacebookViewModel){
+    viewModel.setInstagramDisconnected()
+}
 
 @Composable
 fun CalendarScreen() = ScreenBase("Calendar Screen")

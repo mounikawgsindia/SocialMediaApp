@@ -4,6 +4,7 @@ agp = "8.9.1"
 androidxNavigationComposeVersion = "2.9.6"
 converterGson = "2.11.0"
 facebookAndroidSdk = "18.1.3"
+gson = "2.10.1"
 hiltAndroid = "2.54"
 hiltAndroidCompiler = "2.52"
 hiltAndroidGradlePlugin = "2.52"
@@ -14,11 +15,16 @@ coreKtx = "1.17.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
+kotlinxCoroutinesAndroid = "1.7.3"
 kotlinxCoroutinesAndroidVersion = "1.9.0"
 lifecycleRuntimeKtx = "2.10.0"
 activityCompose = "1.12.0"
 composeBom = "2024.09.00"
 retrofit = "2.11.0"
+scribejavaApis = "9.0.0"
+scribejavaApisVersion = "8.3.3"
+scribejavaCore = "9.0.0"
+scribejavaCoreVersion = "8.3.3"
 
 [libraries]
 accompanist-pager = { module = "com.google.accompanist:accompanist-pager", version.ref = "accompanistPagerIndicators" }
@@ -32,6 +38,7 @@ androidx-material-icons-extended = { module = "androidx.compose.material:materia
 androidx-navigation-navigation-compose2 = { module = "androidx.navigation:navigation-compose", version.ref = "androidxNavigationComposeVersion" }
 converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "converterGson" }
 facebook-android-sdk = { module = "com.facebook.android:facebook-android-sdk", version.ref = "facebookAndroidSdk" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroid" }
 hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hiltAndroidCompiler" }
 hilt-android-gradle-plugin = { module = "com.google.dagger:hilt-android-gradle-plugin", version.ref = "hiltAndroidGradlePlugin" }
@@ -49,9 +56,14 @@ androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+kotlinx-coroutines-android-v173 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
 material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 material3 = { module = "androidx.compose.material3:material3" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
+scribejava-apis = { module = "com.github.scribejava:scribejava-apis", version.ref = "scribejavaApis" }
+scribejava-apis-v833 = { module = "com.github.scribejava:scribejava-apis", version.ref = "scribejavaApisVersion" }
+scribejava-core = { module = "com.github.scribejava:scribejava-core", version.ref = "scribejavaCore" }
+scribejava-core-v833 = { module = "com.github.scribejava:scribejava-core", version.ref = "scribejavaCoreVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
