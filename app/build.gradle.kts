@@ -67,8 +67,18 @@ android {
 }
 
 dependencies {
+
+    //encrption of safe data
+    implementation ("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.browser:browser:1.8.0")
+    //video
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+
+    implementation (libs.androidx.appcompat)
+    implementation (libs.androidx.core.ktx.v1120)
     //coil
-    implementation ("io.coil-kt:coil-compose:2.4.0")
+    implementation (libs.coil.compose)
 
     //twitter
     implementation(libs.scribejava.core.v833)

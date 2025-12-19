@@ -1,5 +1,6 @@
 package com.wingspan.aimediahub.utils
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -8,10 +9,24 @@ import com.wingspan.aimediahub.models.SocialAccount1
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import androidx.core.content.edit
-
-class Prefs @Inject constructor(@ApplicationContext context: Context) {
+import javax.inject.Singleton
+import kotlin.toString
+@Singleton
+class Prefs @Inject constructor(@ApplicationContext private val  context: Context) {
 
     private var prefs= context.getSharedPreferences("facebook_pref",Context.MODE_PRIVATE)
+
+    companion object {
+
+
+        const val KEY_ID="keyid"
+        const val KEY_EMAIL="email"
+        const val KEY_NUMBER="number"
+        const val KEY_USERNAME="username"
+        const val IS_LOGGED_IN="isLoggedIn"
+
+    }
+
     fun saveLongToken(token: String) {
         prefs.edit().putString("LONG_TOKEN", token).apply()
     }
@@ -19,6 +34,37 @@ class Prefs @Inject constructor(@ApplicationContext context: Context) {
     fun getLongToken(): String? {
         return prefs.getString("LONG_TOKEN", null)
     }
+
+    fun isFirstTime(): Boolean{
+
+        return prefs.getBoolean("KEY_IsFirstTime",true)
+    }
+    @SuppressLint("CommitPrefEdits")
+    fun setFirstTime(){
+        prefs.edit {
+            putBoolean("KEY_IsFirstTime", false)
+        }
+    }
+
+    fun saveLoginData(id:String,username:String,email:String,token:String,mobile:String){
+        prefs.edit().apply(){
+            putString(KEY_ID, id)
+            putString(KEY_EMAIL, email)
+            putString(KEY_USERNAME, username)
+            putString(KEY_NUMBER, mobile)
+
+
+            putBoolean(IS_LOGGED_IN, true)
+            SecureStorage.saveToken(context,token.toString())
+            apply()
+        }
+    }
+
+    fun getUserID():String?=prefs.getString(KEY_ID, null)
+    fun getUsername():String?=prefs.getString(KEY_USERNAME, null)
+    fun getUserEmail():String?=prefs.getString(KEY_EMAIL, null)
+    fun getUserNumber():String?=prefs.getString(KEY_NUMBER, null)
+
 
     // ----------------- Save all Facebook data -----------------
 //    fun saveFacebookData(pageId: String, pageImage: String, access_token: String) {
@@ -91,5 +137,16 @@ class Prefs @Inject constructor(@ApplicationContext context: Context) {
             remove("Insta_Account")
             apply()
         }
+    }
+
+    fun isLoggedIn(): Boolean = prefs.getBoolean(IS_LOGGED_IN, false)
+    @SuppressLint("CommitPrefEdits")
+    fun logoutUser(){
+        prefs.edit().apply {
+            putBoolean(IS_LOGGED_IN, false)
+
+            apply() // Commit changes
+        }
+
     }
 }

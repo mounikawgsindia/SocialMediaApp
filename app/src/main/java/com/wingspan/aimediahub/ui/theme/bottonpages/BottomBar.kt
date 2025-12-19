@@ -1,4 +1,4 @@
-package com.wingspan.aimediahub.ui.theme
+package com.wingspan.aimediahub.ui.theme.bottonpages
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -31,7 +31,6 @@ fun BottomBar (navController: NavHostController){
 
     val items = listOf(
         BottomNavItem.Home,
-        BottomNavItem.Create,
         BottomNavItem.Calendar,
         BottomNavItem.Analytics,
         BottomNavItem.Profile

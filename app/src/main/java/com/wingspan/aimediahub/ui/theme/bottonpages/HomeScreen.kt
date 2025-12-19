@@ -2,9 +2,12 @@ package com.wingspan.aimediahub.ui.theme.bottonpages
 
 
 import android.annotation.SuppressLint
-import android.os.Handler
-import android.os.Looper
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,13 +32,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.TabRowDefaults.Divider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -51,9 +62,6 @@ import coil.compose.AsyncImage
 import com.facebook.login.LoginManager
 import com.wingspan.aimediahub.R
 import com.wingspan.aimediahub.utils.AppTextStyles.MainHeadingBlack
-import com.facebook.FacebookCallback
-import com.facebook.FacebookException
-import com.facebook.login.LoginResult
 import com.wingspan.aimediahub.MainActivity
 import com.wingspan.aimediahub.models.SocialAccount
 import com.wingspan.aimediahub.utils.Prefs
@@ -65,18 +73,21 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @SuppressLint("ContextCastToActivity")
 @Composable
 fun HomeScreen( bottomNavController: NavHostController,
-                rootNavController: NavHostController, viewModel: FacebookViewModel =hiltViewModel(),instamodel: InstagramViewModel=hiltViewModel()) {
+                rootNavController: NavHostController,pref:Prefs ,viewModel: FacebookViewModel =hiltViewModel(),instamodel: InstagramViewModel=hiltViewModel()) {
 
     var context= LocalContext.current
-    val prefs = remember { Prefs(context) }
 
+    var showWebView by remember { mutableStateOf(false) }
+    var jwtToken by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(WindowInsets.statusBars
-                .union(WindowInsets.navigationBars)
-                .asPaddingValues()),
+            .padding(
+                WindowInsets.statusBars
+                    .union(WindowInsets.navigationBars)
+                    .asPaddingValues()
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -105,7 +116,14 @@ fun HomeScreen( bottomNavController: NavHostController,
 
             // ---------------- CONNECTED & NON-CONNECTED ACCOUNTS ----------------
             Spacer(Modifier.height(20.dp))
-            ConnectedAccountsSection(viewModel,prefs)
+            ConnectedAccountsSection(viewModel,context,pref, onFacebookConnect = {
+                Log.d("token 1234","--${showWebView}")
+                showWebView = true
+
+            })
+            if (showWebView) {
+                connectFacebook(context,pref)
+            }
             Spacer(Modifier.height(25.dp))
 
 
@@ -128,17 +146,16 @@ fun HomeScreen( bottomNavController: NavHostController,
                 StatBox(title = "Engagement", value = "8.4%", color = Color(0xFFFB8C00)) // Orange
             }
 
-            // ---------------- RECENT POSTS ----------------
-            Text(
-                text = "Recent Posts",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-
+            // ---------------- upcomming POSTS ----------------
             Spacer(Modifier.height(12.dp))
+            UpcomingPostsSection(onArrowClick = {
+                bottomNavController.navigate("calendar") {
+                    // optional: avoid multiple copies in back stack
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            })
 
-            RecentPostItem()
-            RecentPostItem()
 
             Spacer(Modifier.height(25.dp))
 
@@ -160,15 +177,17 @@ fun HomeScreen( bottomNavController: NavHostController,
                 icon = R.drawable.ic_edit,
                 bgColor = Color(0xFFE3F2FF),
                 borderColor = Color(0xFF90CAF9),
-                modifier = Modifier.weight(1f).clickable {
-                    bottomNavController.navigate("create") {
-                        // optional: avoid multiple copies in back stack
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable {
+                        bottomNavController.navigate("calendar") {
+                            // optional: avoid multiple copies in back stack
+                            launchSingleTop = true
+                            restoreState = true
+                        }
 
 
-                }   // Equal width
+                    }   // Equal width
 
                 )
                 ActionButton(
@@ -184,6 +203,69 @@ fun HomeScreen( bottomNavController: NavHostController,
 
     }
 
+}
+@Composable
+fun UpcomingPostsSection(onArrowClick:()->Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(color = Color.White),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        )
+    ) {
+        Column {
+
+            // 🔹 Header Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .background(color = Color.White),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Upcoming posts",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowRight,
+                    contentDescription = "View all",
+                    tint = Color.Blue,
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clickable { onArrowClick() }
+                )
+            }
+
+            // Divider below header
+            Divider(
+                thickness = 0.6.dp,
+                color = Color(0xFFE0E0E0)
+            )
+
+            // 📌 Upcoming Posts List
+            UpcomingPostItemFlat(
+                postText = "Hi facebook",
+                date = "17/12/2025",
+                time = "14:00",
+                platformIcon = R.drawable.ic_fb
+            )
+
+            UpcomingPostItemFlat(
+                postText = "Hi twitter",
+                date = "17/12/2025",
+                time = "12:00",
+                platformIcon = R.drawable.ic_twitter
+            )
+        }
+    }
 }
 
 
@@ -272,41 +354,73 @@ fun StatBox(title: String, value: String, color: Color) {
     }
 }
 @Composable
-fun RecentPostItem() {
+fun UpcomingPostItemFlat(
+    postText: String,
+    date: String,
+    time: String,
+    platformIcon: Int
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+
+        // Platform Icon
         Box(
             modifier = Modifier
-                .size(55.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color.LightGray.copy(alpha = 0.4f))
-        )
-        Spacer(Modifier.width(12.dp))
-
-        Column(
-            modifier = Modifier.fillMaxWidth()
+                .size(15.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFE7F0FF)),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(12.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFE4C8FF))
-            )
-            Spacer(Modifier.height(6.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.7f)
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFD0B3FA))
+            Image(
+                painter = painterResource(id = platformIcon),
+                contentDescription = null,
+                modifier = Modifier.size(12.dp)
             )
         }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        // Post Text + Status
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = postText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        // Time & Date
+        Column(
+            horizontalAlignment = Alignment.End
+        ) {
+
+            Text(
+                text = date,
+                fontSize = 12.sp,
+                color = Color.Gray
+            )
+            Text(
+                text = time,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium
+            )
+
+        }
     }
+
+
 }
+
+
+
 
 @Composable
 fun ActionButton(title: String, icon: Int,
@@ -335,7 +449,7 @@ fun ActionButton(title: String, icon: Int,
 @Composable
 fun ConnectedAccountsSection(
     viewModel: FacebookViewModel = hiltViewModel(),
-    prefs: Prefs
+    context: Context, pref: Prefs, onFacebookConnect: () -> Unit
 ) {
 
     val accounts = viewModel.facebookaccounts.collectAsState()
@@ -516,69 +630,69 @@ fun ConnectedAccountsSection(
                         onConnectClick = {
                             // Start login/connect flow
                             if (account.platform == "Facebook") {
+                               onFacebookConnect()
+//                                LoginManager.getInstance().logInWithReadPermissions(
+//                                    activity,
+//                                    listOf(
+//                                        "public_profile",
+//                                        "email",
+//                                        "pages_show_list",
+//                                        "pages_manage_posts",
+//                                        "pages_read_engagement"
+//                                    )
+//                                )
+//                                // Register callback once
+//                                LoginManager.getInstance().registerCallback(
+//                                    callbackManager,
+//                                    object : FacebookCallback<LoginResult> {
+//                                        override fun onSuccess(result: LoginResult) {
+//
+//                                            Log.d("FB_LOGIN", "Login success callback hit")
+//                                            val permissions = result.accessToken?.permissions ?: emptySet()
+//                                            Log.d("FB_LOGIN", "Permissions = $permissions")
+//
+//                                            // ✅ Request publish only if missing
+//                                            if (!permissions.contains("pages_manage_posts")) {
+//
+//                                                // ❗IMPORTANT: delay helps avoid Facebook SDK crash
+//                                                Handler(Looper.getMainLooper()).postDelayed({
+//
+//                                                    LoginManager.getInstance().logInWithPublishPermissions(
+//                                                        activity,
+//                                                        listOf("pages_manage_posts")
+//                                                    )
+//
+//                                                }, 800)
+//
+//                                                return
+//                                            }
+//                                            val token = result.accessToken?.token
+//
+//                                            //get longlikev token and call getfbpages fun in viewmodel
+//                                            //own account
+////                                            viewModel.getLongLiveToken("1109850424381007","a8d1e54105ae4e089cc97e5d72e4df53",
+////                                                token.toString()
+////                                            )
+//
+//                                            //company account
+////                                            viewModel.getLongLiveToken("1157175713250946","04f63b558e0932cea6df31a46b876ad6",
+////                                                token.toString()
+////                                            )
+//
+//                                            Log.d("FB_LOGIN", "Token = $token")
+//                                        }
+//
+//                                        override fun onCancel() {
+//                                            Log.d("FB_LOGIN", "Login canceled")
+//                                        }
+//
+//                                        override fun onError(error: FacebookException) {
+//                                            Log.e("FB_LOGIN", "Error: ${error.message}")
+//                                        }
+//                                    })
 
-                                LoginManager.getInstance().logInWithReadPermissions(
-                                    activity,
-                                    listOf(
-                                        "public_profile",
-                                        "email",
-                                        "pages_show_list",
-                                        "pages_manage_posts",
-                                        "pages_read_engagement"
-                                    )
-                                )
-                                // Register callback once
-                                LoginManager.getInstance().registerCallback(
-                                    callbackManager,
-                                    object : FacebookCallback<LoginResult> {
-                                        override fun onSuccess(result: LoginResult) {
-
-                                            Log.d("FB_LOGIN", "Login success callback hit")
-                                            val permissions = result.accessToken?.permissions ?: emptySet()
-                                            Log.d("FB_LOGIN", "Permissions = $permissions")
-
-                                            // ✅ Request publish only if missing
-                                            if (!permissions.contains("pages_manage_posts")) {
-
-                                                // ❗IMPORTANT: delay helps avoid Facebook SDK crash
-                                                Handler(Looper.getMainLooper()).postDelayed({
-
-                                                    LoginManager.getInstance().logInWithPublishPermissions(
-                                                        activity,
-                                                        listOf("pages_manage_posts")
-                                                    )
-
-                                                }, 800)
-
-                                                return
-                                            }
-                                            val token = result.accessToken?.token
-
-                                            //get longlikev token and call getfbpages fun in viewmodel
-                                            //own account
-                                            viewModel.getLongLiveToken("1109850424381007","a8d1e54105ae4e089cc97e5d72e4df53",
-                                                token.toString()
-                                            )
-
-                                            //company account
-//                                            viewModel.getLongLiveToken("1157175713250946","04f63b558e0932cea6df31a46b876ad6",
-//                                                token.toString()
-//                                            )
-
-                                            Log.d("FB_LOGIN", "Token = $token")
-                                        }
-
-                                        override fun onCancel() {
-                                            Log.d("FB_LOGIN", "Login canceled")
-                                        }
-
-                                        override fun onError(error: FacebookException) {
-                                            Log.e("FB_LOGIN", "Error: ${error.message}")
-                                        }
-                                    })
 
 
-                                //viewModel.getfbResponse()
                             }
                             if(account.platform=="Instagram"){
                                 //i get this from get token instagram
@@ -588,7 +702,14 @@ fun ConnectedAccountsSection(
 
                             }
                             if(account.platform=="Twitter"){
-                                viewModel.fetchUserProfile("1998625018910326784-B4LG6Zus5ZZp5VcdQJxMmnWGkldIWb","5f05HDr3SA95rnegFQjqwCJeJAafq4bcW4G2zT6nyvyUy")
+                                val userId = pref.getUserID()
+                                Log.d("my id data","---${userId}")
+                                val loginUrl = "https://automatedpostingbackend.onrender.com/auth/twitter?userId=${userId}&platform=android"
+
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
+                                context.startActivity(intent)
+
+                                // viewModel.fetchUserProfile("1998625018910326784-B4LG6Zus5ZZp5VcdQJxMmnWGkldIWb","5f05HDr3SA95rnegFQjqwCJeJAafq4bcW4G2zT6nyvyUy")
                             }
                         }
                     )
@@ -596,6 +717,19 @@ fun ConnectedAccountsSection(
             }
         }
     }
+}
+
+fun connectFacebook(context: Context, pref: Prefs) {
+    val userId = pref.getUserID()
+    Log.d("my id data","---${userId}")
+    val loginUrl = "https://www.facebook.com/v20.0/dialog/oauth?" +
+            "client_id=4196581700605802" +
+            "&redirect_uri=https%3A%2F%2Fautomatedpostingbackend.onrender.com%2Fsocial%2Ffacebook%2Fcallback" +
+            "&state=${userId}%3Aandroid" +  // inject userId here
+            "&scope=pages_read_engagement,pages_manage_posts,pages_show_list,public_profile,email"
+
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
+    context.startActivity(intent)
 }
 fun getIcon(platform: String): Int {
     return when (platform.lowercase()) {
@@ -622,14 +756,12 @@ fun logoutInstagram(viewModel: FacebookViewModel){
     viewModel.setInstagramDisconnected()
 }
 
-@Composable
-fun CalendarScreen() = ScreenBase("Calendar Screen")
+
 
 @Composable
 fun AnalyticsScreen() = ScreenBase("Analytics Screen")
 
-@Composable
-fun ProfileScreen() = ScreenBase("Profile Screen")
+
 
 
 @Composable

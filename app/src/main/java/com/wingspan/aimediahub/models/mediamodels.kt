@@ -2,6 +2,7 @@ package com.wingspan.aimediahub.models
 
 import androidx.compose.ui.graphics.Color
 import com.google.gson.annotations.SerializedName
+import com.wingspan.aimediahub.ui.theme.Sender
 
 data class OnBoardModel(
     val image: Int,
@@ -9,7 +10,7 @@ data class OnBoardModel(
     val description: String
 )
 data class LoginRequest(var email:String?,var password:String?)
-data class ResponseData(var message:String?,var error:String?, var success:Boolean)
+data class ResponseData(var msg:String?,var error:String?, var success:Boolean)
 data class PageResponse( val data: List<PageItem>)
 data class FacebookPostResponse(
     val id: String
@@ -115,4 +116,29 @@ data class TweetData(
 data class ApiResponse(
     val success: Boolean,
     val message: String?
+)
+
+
+data class RegisterRequest(
+    val name: String,
+    val email: String,
+    val phone: String,
+    val password: String
+)
+
+data class OtpVerifyRequest(val email:String?,var otp:String)
+data class AITextRequest(val prompt:String?)
+data class LoginResponse(
+    val msg: String,
+    val token: String?,
+    val userId: String?,
+    val username:String?,
+    val email:String?,
+    val mobile:String?,
+    val success: Boolean
+)
+
+data class ChatMessage(
+    val text: String,
+    val sender: Sender
 )

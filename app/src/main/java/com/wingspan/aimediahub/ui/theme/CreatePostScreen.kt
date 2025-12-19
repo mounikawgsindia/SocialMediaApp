@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,6 +16,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,12 +39,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import java.time.LocalDateTime
 import java.util.Locale
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -55,6 +64,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -75,20 +85,30 @@ import java.time.format.DateTimeFormatter
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun CreatePostScreen(navController: NavHostController,viewModel: FacebookViewModel= hiltViewModel()) {
+fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: FacebookViewModel= hiltViewModel()) {
+
+    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
+    val aiText by savedStateHandle
+        ?.getStateFlow("ai_text", "")
+        ?.collectAsState() ?: remember { mutableStateOf("") }
+
 
     var showSheet by remember { mutableStateOf(false) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedVideoUri by remember { mutableStateOf<Uri?>(null) }
     var postText by remember { mutableStateOf("") }
     var context= LocalContext.current
-    val prefs = remember { Prefs(context) }
+
     var currentfbPages by remember { mutableStateOf(prefs.getFacebookPages().toMutableList()) }
     var twitterProfile by remember {mutableStateOf(prefs.getTwitterAccount())}
     var instaProfile by remember {mutableStateOf(prefs.getInstaAccount())}
 
     val postfbId by viewModel.fbpostStatus.collectAsState()
     val postTwitterId by viewModel.twitterpostStatus.collectAsState()
+    var aiDialog by remember{mutableStateOf(false)}
 
+    Log.d("data123","--->${aiText}")
+    postText=aiText
     LaunchedEffect(postfbId) {
         if (!postfbId.isNullOrEmpty()) {
             Toast.makeText(
@@ -115,15 +135,33 @@ fun CreatePostScreen(navController: NavHostController,viewModel: FacebookViewMod
         rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             selectedImageUri = uri
         }
+
+    val videoPickerLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            selectedVideoUri = uri
+        }
+
     // ✅ Permission Launcher
-    val permissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            if (isGranted) {
-                imagePickerLauncher.launch("image/*")
-            } else {
-                Toast.makeText(context, "Permission Denied", Toast.LENGTH_SHORT).show()
+    val mediaPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+
+            val imageGranted =
+                permissions[android.Manifest.permission.READ_MEDIA_IMAGES] == true ||
+                        permissions[android.Manifest.permission.READ_EXTERNAL_STORAGE] == true
+
+            val videoGranted =
+                permissions[android.Manifest.permission.READ_MEDIA_VIDEO] == true ||
+                        permissions[android.Manifest.permission.READ_EXTERNAL_STORAGE] == true
+
+            when {
+                imageGranted -> imagePickerLauncher.launch("image/*")
+                videoGranted -> videoPickerLauncher.launch("video/*")
+                else -> Toast.makeText(context, "Permission denied", Toast.LENGTH_SHORT).show()
             }
         }
+
 
     Column(
         modifier = Modifier
@@ -184,8 +222,20 @@ fun CreatePostScreen(navController: NavHostController,viewModel: FacebookViewMod
         Divider(color = Color(0xFFE0E0E0))
 
         // ✅ CONTENT FORM
-        PostContentSection(   text = postText,
-            onTextChange = { postText = it },  onAddMediaClick = { showSheet = true })
+        PostContentSection(   text = postText, selectedImageUri = selectedImageUri,selectedVideoUri,
+            onTextChange = { postText = it },  onAddMediaClick = { showSheet = true }, onRemoveImage = { selectedImageUri = null }, onRemoveVideo = {
+
+            }, onAddAIText = {
+                aiDialog=true
+            })
+
+        GenerateAIDialog(
+            showDialog = aiDialog,
+            onDismiss = { aiDialog = false },
+            onGenerate = { topic ->
+                navController.navigate("aichatpage/$topic")
+            }
+        )
         // ✅ BOTTOM SHEET
         if (showSheet) {
             ModalBottomSheet(
@@ -204,21 +254,16 @@ fun CreatePostScreen(navController: NavHostController,viewModel: FacebookViewMod
                         title = "Add Images"
                     ) {
                         showSheet = false
-                        val permission =
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                                android.Manifest.permission.READ_MEDIA_IMAGES
-                            else
-                                android.Manifest.permission.READ_EXTERNAL_STORAGE
 
-                        if (ContextCompat.checkSelfPermission(
-                                context,
-                                permission
-                            ) == PackageManager.PERMISSION_GRANTED
-                        ) {
-                            imagePickerLauncher.launch("image/*")
-                        } else {
-                            permissionLauncher.launch(permission)
-                        }
+                        val permissions =
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES)
+                            } else {
+                                arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+                            }
+
+                        mediaPermissionLauncher.launch(permissions)
+
                     }
 
                     BottomSheetItem(
@@ -226,7 +271,15 @@ fun CreatePostScreen(navController: NavHostController,viewModel: FacebookViewMod
                         title = "Add Video"
                     ) {
                         showSheet = false
-                        // TODO: Open video picker
+
+                        val permissions =
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                arrayOf(android.Manifest.permission.READ_MEDIA_VIDEO)
+                            } else {
+                                arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+                            }
+
+                        mediaPermissionLauncher.launch(permissions)
                     }
 
                     BottomSheetItem(
@@ -240,10 +293,66 @@ fun CreatePostScreen(navController: NavHostController,viewModel: FacebookViewMod
             }
         }
 
-
     }
 }
 
+@Composable
+fun GenerateAIDialog(
+    showDialog: Boolean,
+    onDismiss: () -> Unit,
+    onGenerate: (String) -> Unit
+) {
+    var topic by remember { mutableStateOf("") }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(
+                    text = "Write topic",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Enter the topic to generate AI content",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = topic,
+                        onValueChange = { topic = it },
+                        placeholder = { Text("Eg: Benefits of AI in Healthcare") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines  = 3,
+                        maxLines=5
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = topic.isNotBlank(),
+                    onClick = {
+                        onGenerate(topic)
+                        onDismiss()
+                    }
+                ) {
+                    Text("Generate")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
 
 @Composable
 fun BottomSheetItem(
@@ -460,8 +569,8 @@ fun SocialChip(
 
 
 @Composable
-fun PostContentSection(    text: String,
-                           onTextChange: (String) -> Unit, onAddMediaClick: () -> Unit) {
+fun PostContentSection(text: String, selectedImageUri: Uri?,selectedVideoUri:Uri?,
+                           onTextChange: (String) -> Unit, onRemoveImage: () -> Unit, onRemoveVideo: () -> Unit, onAddMediaClick: () -> Unit,onAddAIText:()-> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -532,26 +641,30 @@ fun PostContentSection(    text: String,
                 }
             }
         )
-        // Bottom Counter
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
 
-            Spacer(Modifier.weight(1f))
 
-            Text("${text.length} / 16192", color = Color.Gray)
 
-            Spacer(Modifier.width(6.dp))
-
-            Icon(
-                painter = painterResource(R.drawable.ic_fb),
-                contentDescription = "",
-                modifier = Modifier.size(18.dp)
+        // ---------- Selected Image in Card ----------
+        selectedImageUri?.let { uri ->
+            MediaCard(
+                onRemove = onRemoveImage
+            ) {
+                AsyncImage(
+                    model = uri,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+        //--- video------
+        selectedVideoUri?.let { uri ->
+            VideoPreviewCard(
+                videoUri = uri,
+                onRemove = onRemoveVideo
             )
         }
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.clickable {onAddMediaClick() }
@@ -572,8 +685,61 @@ fun PostContentSection(    text: String,
                 fontWeight = FontWeight.Medium
             )
         }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable {onAddAIText() }
+        ) {
+            Icon(
+                imageVector = Icons.Default.Image, // or your custom icon
+                contentDescription = "AI",
+                tint = Color(0xFF1976D2), // Blue color
+                modifier = Modifier.size(20.dp)
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = "Add AI Generated Text",
+                color = Color(0xFF1976D2),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
 
 
+    }
+}
+@Composable
+internal fun MediaCard(
+    onRemove: () -> Unit,
+    content: @Composable BoxScope.() -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .padding(vertical = 8.dp)
+            .size(150.dp),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Box {
+            content()
+
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .align(Alignment.TopEnd)
+                    .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                    .clickable { onRemove() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_close),
+                    contentDescription = "Remove",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
     }
 }
 

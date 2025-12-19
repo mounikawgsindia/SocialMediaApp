@@ -1,4 +1,4 @@
-package com.wingspan.aimediahub.ui.theme
+package com.wingspan.aimediahub.ui.theme.bottonpages
 
 import android.os.Build
 import androidx.annotation.RequiresApi
@@ -11,14 +11,11 @@ import androidx.navigation.compose.rememberNavController
 import com.wingspan.aimediahub.utils.BottomNavItem
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.wingspan.aimediahub.ui.theme.bottonpages.AnalyticsScreen
-import com.wingspan.aimediahub.ui.theme.bottonpages.CalendarScreen
-import com.wingspan.aimediahub.ui.theme.bottonpages.HomeScreen
-import com.wingspan.aimediahub.ui.theme.bottonpages.ProfileScreen
+import com.wingspan.aimediahub.utils.Prefs
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun AppNavigation(rootNavController: NavHostController) {
+fun AppNavigation(rootNavController: NavHostController, prefs: Prefs) {
 
     val childNavController  = rememberNavController()
 
@@ -35,23 +32,25 @@ fun AppNavigation(rootNavController: NavHostController) {
             composable(BottomNavItem.Home.route) {
                 HomeScreen(
                     bottomNavController = childNavController,
-                    rootNavController = rootNavController
+                    rootNavController = rootNavController,prefs
                 )
             }
-            composable(BottomNavItem.Create.route) {
-                CreateScreen(
-                    bottomNavController = childNavController,
-                    rootNavController = rootNavController
-                )
-            }
+//            composable(BottomNavItem.Create.route) {
+//                CreateScreen(
+//                    bottomNavController = childNavController,
+//                    rootNavController = rootNavController
+//                )
+//            }
             composable(BottomNavItem.Calendar.route) {
-                CalendarScreen()
+                CalendarScreen( bottomNavController = childNavController,
+                    rootNavController = rootNavController,prefs)
             }
             composable(BottomNavItem.Analytics.route) {
                 AnalyticsScreen()
             }
             composable(BottomNavItem.Profile.route) {
-                ProfileScreen()
+                ProfileScreen(bottomNavController = childNavController,
+                    rootNavController = rootNavController,prefs)
             }
         }
     }
