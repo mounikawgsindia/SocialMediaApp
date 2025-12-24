@@ -2,6 +2,8 @@ package com.wingspan.aimediahub.ui.theme.bottonpages
 
 import android.annotation.SuppressLint
 import android.os.Build
+import android.util.Log
+import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -51,12 +53,24 @@ import com.wingspan.aimediahub.ui.theme.SoftLavender
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.wingspan.aimediahub.models.Post
 import com.wingspan.aimediahub.ui.theme.DailyCalendarGrid
 import com.wingspan.aimediahub.ui.theme.WeeklyCalendarGrid
+import com.wingspan.aimediahub.utils.NetworkUtils
 import com.wingspan.aimediahub.utils.Prefs
+import com.wingspan.aimediahub.viewmodel.FacebookViewModel
 import java.time.LocalDate
 import java.time.DayOfWeek
+import java.time.Instant
+import java.time.ZoneId
+
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @RequiresApi(Build.VERSION_CODES.O)
@@ -64,22 +78,41 @@ import java.time.DayOfWeek
 fun CalendarScreen(
     bottomNavController: NavHostController,
     rootNavController: NavHostController,
-    prefs: Prefs
+    prefs: Prefs,viewmodel: FacebookViewModel= hiltViewModel()
 ) {
 
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
     var selectedDay by remember { mutableStateOf(LocalDate.now()) }
-
+    var context= LocalContext.current
+    val postData by viewmodel.fbgetPostStatus.collectAsState()
     var selectedPosts by remember { mutableStateOf(0) }
     var showBottomSheet by remember { mutableStateOf(false) }
-
+    var selectedDayPosts by remember { mutableStateOf<List<Post>>(emptyList()) }
 
     var viewMode by remember { mutableStateOf(CalendarViewMode.MONTH) }
     var showViewModeSheet by remember { mutableStateOf(false) }
     var weekStart by remember {
         mutableStateOf(LocalDate.now().with(DayOfWeek.MONDAY))
     }
+    // This is your list stored for calendar usage
+    val calendarPostList = remember(postData) {
+        postData
+    }
 
+    //count date
+    val postCountByDate = remember(postData) {
+        postData
+            ?.groupBy {
+                Instant.parse(it.createdAt)
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDate()
+            }
+            ?.mapValues { it.value.size }
+            ?: emptyMap()
+    }
+
+
+    Log.d("calender list","--->${calendarPostList}")
     val daysOfWeek = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
 
     val sampleDailyPosts = mapOf(
@@ -88,6 +121,16 @@ fun CalendarScreen(
         15 to "Product Reel",
         18 to "Evening Story"
     )
+
+    LaunchedEffect(Unit) {
+        if(NetworkUtils.isNetworkAvailable(context =context )){
+            viewmodel.getPostedApi()
+        }else{
+            Toast.makeText(context,"Check your internet connection", Toast.LENGTH_SHORT).show()
+        }
+
+    }
+
 
     Scaffold(
         floatingActionButton = {
@@ -145,9 +188,16 @@ fun CalendarScreen(
                             )
                         }
                     }
-                    CalendarGrid(currentMonth, onDayLongPress = { day, posts ->
+                    CalendarGrid(currentMonth, postCountByDate = postCountByDate,onDayLongPress = { day, posts ->
+
                         selectedDay = LocalDate.of(currentMonth.year, currentMonth.month, day)
                         selectedPosts = posts
+                        selectedDayPosts = postData
+                            ?.filter {
+                                Instant.parse(it.createdAt)
+                                    .atZone(ZoneId.systemDefault())
+                                    .toLocalDate() == selectedDay
+                            } ?: emptyList()
                         showBottomSheet = true
                     })
                 }
@@ -193,6 +243,9 @@ fun CalendarScreen(
                 posts = selectedPosts,
                 onViewPosts = {
                     showBottomSheet = false
+                    rootNavController.currentBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("day_posts", selectedDayPosts)
                     rootNavController.navigate("view_posts/$selectedDay")
                 },
                 onCreatePost = {
@@ -446,7 +499,8 @@ fun LocalDate.toWeekStart(): LocalDate =
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun CalendarGrid(currentMonth: YearMonth,onDayLongPress: (Int, Int) -> Unit) {
+fun CalendarGrid(currentMonth: YearMonth,
+                 postCountByDate: Map<LocalDate, Int>,onDayLongPress: (Int, Int) -> Unit) {
 
     val daysInMonth = currentMonth.lengthOfMonth()
     val firstDayOfWeek = currentMonth.atDay(1).dayOfWeek.value // 1 = Monday
@@ -458,11 +512,15 @@ fun CalendarGrid(currentMonth: YearMonth,onDayLongPress: (Int, Int) -> Unit) {
         items(42) { index ->
             val dayNumber = index - (firstDayOfWeek - 1) + 1
 
-            val posts = when (dayNumber) {
-                17 -> 3
-                18 -> 2
-                else -> 0
-            }
+            val posts = if (dayNumber in 1..daysInMonth) {
+                val date = LocalDate.of(
+                    currentMonth.year,
+                    currentMonth.month,
+                    dayNumber
+                )
+                postCountByDate[date] ?: 0
+            } else 0
+
             CalendarDay(
                 day = if (dayNumber in 1..daysInMonth) dayNumber else null,
                 posts = posts,

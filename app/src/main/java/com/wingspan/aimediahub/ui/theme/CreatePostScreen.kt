@@ -1,6 +1,8 @@
 package com.wingspan.aimediahub.ui.theme
 
 import android.annotation.SuppressLint
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -79,6 +81,8 @@ import com.wingspan.aimediahub.R
 import com.wingspan.aimediahub.models.SocialAccount1
 import com.wingspan.aimediahub.utils.Prefs
 import com.wingspan.aimediahub.viewmodel.FacebookViewModel
+import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 @SuppressLint("MutableCollectionMutableState")
@@ -88,29 +92,39 @@ import java.time.format.DateTimeFormatter
 fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: FacebookViewModel= hiltViewModel()) {
 
     val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
-    val aiText by savedStateHandle
-        ?.getStateFlow("ai_text", "")
-        ?.collectAsState() ?: remember { mutableStateOf("") }
+
+
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+    var selectedTime by remember { mutableStateOf<LocalTime?>(null) }
 
 
     var showSheet by remember { mutableStateOf(false) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var selectedVideoUri by remember { mutableStateOf<Uri?>(null) }
-    var postText by remember { mutableStateOf("") }
+
     var context= LocalContext.current
 
     var currentfbPages by remember { mutableStateOf(prefs.getFacebookPages().toMutableList()) }
     var twitterProfile by remember {mutableStateOf(prefs.getTwitterAccount())}
+    var linkedInProfile by remember {mutableStateOf(prefs.getLinkedInAccount())}
     var instaProfile by remember {mutableStateOf(prefs.getInstaAccount())}
 
     val postfbId by viewModel.fbpostStatus.collectAsState()
     val postTwitterId by viewModel.twitterpostStatus.collectAsState()
     var aiDialog by remember{mutableStateOf(false)}
 
-    Log.d("data123","--->${aiText}")
-    postText=aiText
+    val aiText = savedStateHandle?.getStateFlow("ai_text", "")?.collectAsState(initial = "")?.value.orEmpty()
+
+    var postText by remember { mutableStateOf("") }
+
+    LaunchedEffect(aiText) {
+        if (postText.isBlank() && aiText.isNotBlank()) {
+            postText = aiText
+        }
+    }
+
     LaunchedEffect(postfbId) {
-        if (!postfbId.isNullOrEmpty()) {
+        if (postfbId == true) {
             Toast.makeText(
                 context,
                 "Facebook Post successfully",
@@ -118,6 +132,8 @@ fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: Fac
             ).show()
         }
         postText=""
+        selectedImageUri=null
+        viewModel.clearFbPostStatus()
     }
     LaunchedEffect(postTwitterId) {
         if (!postTwitterId.isNullOrEmpty()) {
@@ -178,25 +194,31 @@ fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: Fac
                 if(!message.isEmpty()){
                     if (currentfbPages.isNotEmpty()) {
                         currentfbPages.forEach { page ->
+                            val sheduleTime =
+                                if (selectedDate != null && selectedTime != null) {
+                                    "${selectedDate!!.format(DateTimeFormatter.ISO_DATE)} " +
+                                            selectedTime!!.format(DateTimeFormatter.ofPattern("HH:mm"))
+                                } else {
+                                    ""
+                                }
 
-                            viewModel.postToFacebook(
+                            viewModel.publishFacebookPost(
                                 pageId = page.id,
-                                pageToken = page.accessToken,
-                                message = message
-                            )
-
+                                sheduleTime=sheduleTime,
+                                message = message, imageUri = selectedImageUri)
                         }
 
                     }
                     if(twitterProfile!=null){
-                        var accessToken="1998625018910326784-B4LG6Zus5ZZp5VcdQJxMmnWGkldIWb"
-                        viewModel.postTweet(accessToken,"5f05HDr3SA95rnegFQjqwCJeJAafq4bcW4G2zT6nyvyUy",message)
+
                     }
                     if(instaProfile!=null){
-                        val longlivedToken = "IGAATWB2zHKD1BZAGJlYUp2akY1TG1fa3pUeU80MUJHbC1XNFY5aWRabWdEaV9RRDZATbDRkeDNEa0NET19JR0dkSkNReTZARYjhVMnhqU1NkYVB2VUNGZAjZAXUHFEcEs4WXVhcjRqTkJJYXJGQTlvb2Y1dlBtbnpIdjdWbnRMY1RXawZDZD"
-                        viewModel.fetchUserMedia(longlivedToken)
+
                     }
-                    if(!currentfbPages.isNotEmpty() && twitterProfile==null && instaProfile==null) {
+                    if(linkedInProfile!=null){
+
+                    }
+                    if(!currentfbPages.isNotEmpty() && twitterProfile==null && instaProfile==null && linkedInProfile==null) {
                         Toast.makeText(context, "No profiles connected", Toast.LENGTH_SHORT).show()
                     }
                 }else{
@@ -208,7 +230,7 @@ fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: Fac
 
         // ✅ DATE & PLATFORM ROW
         DateAndPlatformRow(
-            currentPages = currentfbPages,twitterPage=twitterProfile,instagramPage=instaProfile,
+            currentPages = currentfbPages,twitterPage=twitterProfile, linkedInPage = linkedInProfile, instagramPage=instaProfile,
             onPagesChange = { updatedList ->
                 currentfbPages = updatedList
             }, context = context,
@@ -216,6 +238,11 @@ fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: Fac
                 twitterProfile = null
             },onRemoveInstagram={
                 instaProfile=null
+            },
+            onDateTimeSelected = { date, time ->
+                selectedDate = date
+                selectedTime = time
+                Log.d("DateTimeSelected", "Date: $date, Time: $time")
             }
         )
 
@@ -287,7 +314,7 @@ fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: Fac
                         title = "Open Camera"
                     ) {
                         showSheet = false
-                        // TODO: Open camera
+
                     }
                 }
             }
@@ -420,14 +447,23 @@ fun NewPostTopBar(
 fun DateAndPlatformRow(
     currentPages: MutableList<SocialAccount1>,
     onPagesChange: (MutableList<SocialAccount1>) -> Unit,
-    twitterPage: SocialAccount1?,instagramPage :SocialAccount1?,
-    context: Context, onRemoveTwitter: () -> Unit,onRemoveInstagram:()-> Unit
-
+    twitterPage: SocialAccount1?,
+    linkedInPage: SocialAccount1?,
+    instagramPage: SocialAccount1?,
+    context: Context,
+    onRemoveTwitter: () -> Unit,
+    onRemoveInstagram: () -> Unit,
+    onDateTimeSelected: (LocalDate, LocalTime) -> Unit
 ) {
 
-    val currentDateTime = LocalDateTime.now()
-    val formatter = DateTimeFormatter.ofPattern("MMM d, yyyy  h:mm a", Locale.ENGLISH)
-    val formattedDate = currentDateTime.format(formatter)
+    var selectedDateTime by remember {
+        mutableStateOf(LocalDateTime.now())
+    }
+
+    val formatter =
+        DateTimeFormatter.ofPattern("MMM d, yyyy  h:mm a", Locale.ENGLISH)
+
+    val formattedDate = selectedDateTime.format(formatter)
 
     Column(
         modifier = Modifier
@@ -435,39 +471,83 @@ fun DateAndPlatformRow(
             .padding(14.dp)
     ) {
 
-        // ---------------------- DATE ----------------------
+
+        // ---------------------- DATE & TIME PICKER ----------------------
         Box(
             modifier = Modifier
                 .background(Color.White, RoundedCornerShape(8.dp))
                 .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
-                .padding(horizontal = 14.dp, vertical = 6.dp)
+                .clickable {
+                    // <-- REPLACE YOUR EXISTING CLICKABLE BLOCK WITH THIS
+                    val datePicker = DatePickerDialog(
+                        context,
+                        { _, year, month, dayOfMonth ->
+
+                            TimePickerDialog(
+                                context,
+                                { _, hour, minute ->
+                                    selectedDateTime = LocalDateTime.of(
+                                        year,
+                                        month + 1,
+                                        dayOfMonth,
+                                        hour,
+                                        minute
+                                    )
+
+                                    // Pass selected date and time to parent
+                                    onDateTimeSelected(
+                                        selectedDateTime.toLocalDate(),
+                                        selectedDateTime.toLocalTime()
+                                    )
+
+                                },
+                                selectedDateTime.hour,
+                                selectedDateTime.minute,
+                                false
+                            ).show()
+                        },
+                        selectedDateTime.year,
+                        selectedDateTime.monthValue - 1,
+                        selectedDateTime.dayOfMonth
+                    )
+
+                    datePicker.datePicker.minDate = System.currentTimeMillis()
+                    datePicker.show()
+                }
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Text(text = formattedDate, fontWeight = FontWeight.Medium)
+            Text(
+                text = formattedDate,
+                fontWeight = FontWeight.Medium
+            )
         }
+
 
         Spacer(Modifier.height(12.dp))
 
+        // ---------------------- PLATFORMS ----------------------
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
 
-            // ---------- FACEBOOK PAGES ----------
+            // FACEBOOK PAGES
             items(currentPages.size) { index ->
-                var page =currentPages[index]
+                val page = currentPages[index]
                 SocialChip(
                     icon = R.drawable.ic_fb,
                     iconTint = Color(0xFF1877F2),
                     imageUrl = page.imageUrl,
                     label = page.name,
                     onRemove = {
-                        val updated = currentPages.filter { it.id != page.id }.toMutableList()
+                        val updated =
+                            currentPages.filter { it.id != page.id }.toMutableList()
                         onPagesChange(updated)
                     }
                 )
             }
 
-            // ---------- TWITTER ----------
+            // TWITTER
             twitterPage?.let { tp ->
                 item {
                     SocialChip(
@@ -475,29 +555,35 @@ fun DateAndPlatformRow(
                         iconTint = Color(0xFF1DA1F2),
                         imageUrl = tp.imageUrl,
                         label = tp.name,
-                        onRemove = {
-                            onRemoveTwitter()
-                        }
+                        onRemove = onRemoveTwitter
+                    )
+                }
+            }
+            linkedInPage?.let {tp->
+                item {
+                    SocialChip(
+                        icon = R.drawable.ic_linkedin,
+                        iconTint = Color(0xFF1DA1F2),
+                        imageUrl = tp.imageUrl,
+                        label = tp.name,
+                        onRemove = onRemoveTwitter
                     )
                 }
             }
 
-            // ---------- INSTAGRAM ----------
+            // INSTAGRAM
             instagramPage?.let { ip ->
                 item {
                     SocialChip(
                         icon = R.drawable.ic_instagram,
-                        iconTint = Color(0xFFDD2A7B), // IG color
+                        iconTint = Color(0xFFDD2A7B),
                         imageUrl = ip.imageUrl,
                         label = ip.name,
-                        onRemove = {
-                            onRemoveInstagram()
-                        }
+                        onRemove = onRemoveInstagram
                     )
                 }
             }
         }
-
     }
 }
 
@@ -631,6 +717,7 @@ fun PostContentSection(text: String, selectedImageUri: Uri?,selectedVideoUri:Uri
             onValueChange = { onTextChange(it) },
             modifier = Modifier.fillMaxWidth()
                 .height(200.dp)
+                .height(200.dp)
                 .padding(12.dp),
             decorationBox = { inner ->
                 Box {
@@ -745,13 +832,6 @@ internal fun MediaCard(
 
 
 
-// ---------- Sample Content ----------
-fun samplePosts(): List<ScheduledPost> = listOf(
-    ScheduledPost(1, "9:15 AM", "Facebook", "Good morning everyone! Here's today's update and a quick tip to start your day.", Accent1),
-    ScheduledPost(2, "10:00 AM", "Instagram", "New carousel: 5 ways to improve productivity at work. Swipe to see!", Color(0xFF42A5F5)),
-    ScheduledPost(3, "1:30 PM", "LinkedIn", "Hiring update: We're looking for an Android developer experienced in Jetpack Compose.", Color(0xFFAB47BC)),
-    ScheduledPost(4, "5:00 PM", "Twitter", "Short tip: Use WorkManager for scheduled background posts.", Color(0xFF26A69A))
-)
 
 
 

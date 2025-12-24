@@ -2,6 +2,7 @@ package com.wingspan.aimediahub.ui.theme.bottonpages
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -15,12 +16,18 @@ import com.wingspan.aimediahub.utils.Prefs
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun AppNavigation(rootNavController: NavHostController, prefs: Prefs) {
+fun AppNavigation(
+    rootNavController: NavHostController, prefs: Prefs,
+    fbDeepLink: Boolean = false,
+    twitterDeepLink: Boolean = false,
+    linkedInDeepLink: Boolean
+) {
 
     val childNavController  = rememberNavController()
 
     Scaffold(
-        bottomBar = { BottomBar(childNavController) }
+        bottomBar = { BottomBar(childNavController) },
+        contentWindowInsets = WindowInsets(0)
     ) { paddingValues ->
 
         NavHost(
@@ -32,15 +39,11 @@ fun AppNavigation(rootNavController: NavHostController, prefs: Prefs) {
             composable(BottomNavItem.Home.route) {
                 HomeScreen(
                     bottomNavController = childNavController,
-                    rootNavController = rootNavController,prefs
+                    rootNavController = rootNavController,prefs,
+                    fbDeepLink.toString(), twitterDeepLink.toString(),linkedInDeepLink.toString()
                 )
             }
-//            composable(BottomNavItem.Create.route) {
-//                CreateScreen(
-//                    bottomNavController = childNavController,
-//                    rootNavController = rootNavController
-//                )
-//            }
+
             composable(BottomNavItem.Calendar.route) {
                 CalendarScreen( bottomNavController = childNavController,
                     rootNavController = rootNavController,prefs)

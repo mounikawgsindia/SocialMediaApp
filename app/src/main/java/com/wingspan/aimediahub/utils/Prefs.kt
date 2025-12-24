@@ -27,13 +27,9 @@ class Prefs @Inject constructor(@ApplicationContext private val  context: Contex
 
     }
 
-    fun saveLongToken(token: String) {
-        prefs.edit().putString("LONG_TOKEN", token).apply()
-    }
+
     private val gson = Gson()
-    fun getLongToken(): String? {
-        return prefs.getString("LONG_TOKEN", null)
-    }
+
 
     fun isFirstTime(): Boolean{
 
@@ -85,6 +81,11 @@ class Prefs @Inject constructor(@ApplicationContext private val  context: Contex
         prefs.edit() { putString("TWITTER_ACCOUNTS", json) }
     }
 
+    fun saveLinkedInAccounts(accounts: SocialAccount1) {
+        val json = gson.toJson(accounts)
+        prefs.edit() { putString("LinkedIn_Account", json) }
+    }
+
     fun saveInstagramAccounts(accounts: SocialAccount1) {
         val json = gson.toJson(accounts)
         prefs.edit() { putString("Insta_Account", json) }
@@ -105,6 +106,12 @@ class Prefs @Inject constructor(@ApplicationContext private val  context: Contex
         val json = prefs.getString("TWITTER_ACCOUNTS", null)
         return if (!json.isNullOrEmpty()) gson.fromJson(json, SocialAccount1::class.java) else null
     }
+
+    fun getLinkedInAccount(): SocialAccount1? {
+        val json = prefs.getString("LinkedIn_Account", null)
+        return if (!json.isNullOrEmpty()) gson.fromJson(json, SocialAccount1::class.java) else null
+    }
+
 
     fun getInstaAccount(): SocialAccount1? {
         val json = prefs.getString("Insta_Account", null)

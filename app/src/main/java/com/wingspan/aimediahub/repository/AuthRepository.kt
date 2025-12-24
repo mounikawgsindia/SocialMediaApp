@@ -30,131 +30,75 @@ import kotlin.toString
     private val apiService: ApiServices
 ) {
 
+     /**
+      * Common API call handler
+      */
 
+         private inline fun <reified T : Any> safeApiCall(
+             crossinline apiCall: suspend () -> retrofit2.Response<T>,
+             errorKey: String = "message"
+         ): Flow<Resource<T>> = flow {
 
-    fun login(request: LoginRequest): Flow<Resource<LoginResponse>> = flow {
-        emit(Resource.Loading())
-        Log.d("login","--")
-        val response = apiService.login(request)
-        if (response.isSuccessful) {
-            Log.d("login",response.body().toString())
-            if(response.body()!=null){
-                emit(Resource.Success(response.body()!!))
-            }else{
-                emit(Resource.Error("Empty response body"))
-            }
-
-        } else {
-            val errorBody = response.errorBody()
-            val errorMsg = errorBody?.let {
-                val errorStr = it.charStream().readText()
-                Log.e("login", errorStr) // log raw JSON once
-                try {
-                    val errorJson = JSONObject(errorStr)
-                    errorJson.optString("message", "Something went wrong")
-                } catch (e: Exception) {
-                    "Something went wrong"
-                }
-            } ?: "Something went wrong"
-            Log.e("login","--${errorMsg}")
-            emit(Resource.Error(errorMsg))
-        }
-    }.catch { e ->
-        Log.e("login catch", "--${e.message}")
-
-        val errorMsg = when (e) {
-            is SocketTimeoutException -> "Request timed out. Please try again."
-            is UnknownHostException -> "No internet connection. Please check your network."
-            is IOException -> "Network error. Please check your connection."
-            else -> e.message ?: "Unexpected error occurred"
-        }
-
-        emit(Resource.Error(errorMsg))
-    }.flowOn(Dispatchers.IO)
-
-
-
-     fun registration(request: RegisterRequest): Flow<Resource<ResponseData>> = flow {
          emit(Resource.Loading())
-         Log.d("registration","--")
-         val response = apiService.registration(request)
+
+         val response = apiCall()
+
          if (response.isSuccessful) {
-             Log.d("registration",response.body().toString())
-             if(response.body()!=null){
-                 emit(Resource.Success(response.body()!!))
-             }else{
+             val body = response.body()
+             if (body != null) {
+                 emit(Resource.Success(body))
+             } else {
                  emit(Resource.Error("Empty response body"))
              }
-
          } else {
-             val errorBody = response.errorBody()
-             val errorMsg = errorBody?.let {
+             val errorMsg = response.errorBody()?.let {
                  val errorStr = it.charStream().readText()
-                 Log.e("registration", errorStr) // log raw JSON once
+                 Log.e("API_ERROR", errorStr)
                  try {
-                     val errorJson = JSONObject(errorStr)
-                     errorJson.optString("msg", "Something went wrong")
+                     JSONObject(errorStr).optString(errorKey, "Something went wrong")
                  } catch (e: Exception) {
                      "Something went wrong"
                  }
              } ?: "Something went wrong"
-             Log.e("registration","--${errorMsg}")
+
              emit(Resource.Error(errorMsg))
          }
-     }.catch { e ->
-         Log.e("registration catch", "--${e.message}")
 
+     }.catch { e ->
          val errorMsg = when (e) {
-             is SocketTimeoutException -> "Request timed out. Please try again."
-             is UnknownHostException -> "No internet connection. Please check your network."
-             is IOException -> "Network error. Please check your connection."
-             else -> e.message ?: "Unexpected error occurred"
+             is SocketTimeoutException ->
+                 "Request timed out. Please try again."
+             is UnknownHostException ->
+                 "No internet connection. Please check your network."
+             is IOException ->
+                 "Network error. Please check your connection."
+             else ->
+                 e.message ?: "Unexpected error occurred"
          }
 
+         Log.e("API_CATCH", errorMsg)
          emit(Resource.Error(errorMsg))
+
      }.flowOn(Dispatchers.IO)
 
+     // 🔹 LOGIN
+     fun login(request: LoginRequest): Flow<Resource<LoginResponse>> =
+         safeApiCall(
+             apiCall = { apiService.login(request) },
+             errorKey = "message"
+         )
 
-     fun otpVerify(request: OtpVerifyRequest): Flow<Resource<ResponseData>> = flow {
-         emit(Resource.Loading())
-         Log.d("otpVerify","--")
-         val response = apiService.verifyOtp(request)
-         if (response.isSuccessful) {
-             Log.d("otpVerify",response.body().toString())
-             if(response.body()!=null){
-                 emit(Resource.Success(response.body()!!))
-             }else{
-                 emit(Resource.Error("Empty response body"))
-             }
+     // 🔹 REGISTRATION
+     fun registration(request: RegisterRequest): Flow<Resource<ResponseData>> =
+         safeApiCall(
+             apiCall = { apiService.registration(request) },
+             errorKey = "msg"
+         )
 
-         } else {
-             val errorBody = response.errorBody()
-             val errorMsg = errorBody?.let {
-                 val errorStr = it.charStream().readText()
-                 Log.e("otpVerify", errorStr) // log raw JSON once
-                 try {
-                     val errorJson = JSONObject(errorStr)
-                     errorJson.optString("msg", "Something went wrong")
-                 } catch (e: Exception) {
-                     "Something went wrong"
-                 }
-             } ?: "Something went wrong"
-             Log.e("otpVerify","--${errorMsg}")
-             emit(Resource.Error(errorMsg))
-         }
-     }.catch { e ->
-         Log.e("otpVerify catch", "--${e.message}")
-
-         val errorMsg = when (e) {
-             is SocketTimeoutException -> "Request timed out. Please try again."
-             is UnknownHostException -> "No internet connection. Please check your network."
-             is IOException -> "Network error. Please check your connection."
-             else -> e.message ?: "Unexpected error occurred"
-         }
-
-         emit(Resource.Error(errorMsg))
-     }.flowOn(Dispatchers.IO)
-
-
-
+     // 🔹 OTP VERIFY
+     fun otpVerify(request: OtpVerifyRequest): Flow<Resource<ResponseData>> =
+         safeApiCall(
+             apiCall = { apiService.verifyOtp(request) },
+             errorKey = "msg"
+         )
  }

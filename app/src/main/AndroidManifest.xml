@@ -22,30 +22,36 @@
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.AiMediaHub">
+            <!-- Existing launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Facebook deep link -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="com.wingspan.aimediahub"
-                    android:host="login-success" />
+                <data android:scheme="com.wingspan.aimediahub" android:host="login-success" />
             </intent-filter>
-        </activity>
-        <activity android:name="com.wingspan.aimediahub.ui.theme.callbacks.TwitterCallbackActivity"
-            android:exported="true">
+
+            <!-- Twitter deep link -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="com.wingspan.aimediahub" android:host="twitter-callback"/>
             </intent-filter>
-        </activity>
 
+            <!-- linked in-->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.wingspan.aimediahub" android:host="linkedin-callback"/>
+            </intent-filter>
+        </activity>
 
         <meta-data
             android:name="com.facebook.sdk.AutoLogAppEventsEnabled"

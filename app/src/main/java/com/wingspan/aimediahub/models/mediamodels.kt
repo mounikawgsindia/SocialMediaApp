@@ -1,8 +1,11 @@
 package com.wingspan.aimediahub.models
 
+import android.annotation.SuppressLint
+import android.os.Parcelable
 import androidx.compose.ui.graphics.Color
 import com.google.gson.annotations.SerializedName
 import com.wingspan.aimediahub.ui.theme.Sender
+import kotlinx.parcelize.Parcelize
 
 data class OnBoardModel(
     val image: Int,
@@ -11,16 +14,19 @@ data class OnBoardModel(
 )
 data class LoginRequest(var email:String?,var password:String?)
 data class ResponseData(var msg:String?,var error:String?, var success:Boolean)
-data class PageResponse( val data: List<PageItem>)
-data class FacebookPostResponse(
-    val id: String
-)
+data class PageResponse( val pages: List<PageItem>)
+
 
 data class PageItem(
+    val providerId: String,
+    val accessToken: String,
+    val meta: PageMeta
+)
+
+data class PageMeta(
     val id: String,
     val name: String,
-    val access_token: String,
-    val picture: Picture1?          // NEW
+    val picture: String?
 )
 data class Picture1(val data: PictureData)
 data class PictureData(val url: String)
@@ -35,16 +41,9 @@ data class SocialAccount(
     val connected: Boolean = false,
     val imageUrl: String? = null,
     val accessToken: String? = null, // store token for connected accounts
-    val showDisconnectOnly: Boolean = false
+    val showDisconnectOnly: Boolean = false,val id: String="0",
 )
-data class SocialAccount1(
-    val id: String,           // Facebook Page ID
-    val name: String,         // Page name
-    val accessToken: String,  // Page access token
-    val imageUrl: String?,
-   val platform:String?
-    // Page profile image URL
-)
+
 // ---------- Sample data models ----------
 data class ScheduledPost(
     val id: Int,
@@ -137,8 +136,103 @@ data class LoginResponse(
     val mobile:String?,
     val success: Boolean
 )
+data class DisconnectRequest(var userId:String)
 
 data class ChatMessage(
     val text: String,
     val sender: Sender
 )
+
+//twitter class
+
+data class TwitterPostResponse(
+    val success: Boolean,
+    val tweetId: String?,
+    val tweetUrl: String?,
+    val message: String?,
+    val username: String?
+)
+data class TwitterConnectResponse(
+    val success: Boolean,
+    val connected: Boolean,
+    val message: String?,
+    val profile: TwitterProfile?
+)
+
+data class LinkedInProfileResponse(
+    val success: Boolean,
+    val connected: Boolean,
+    val profile: LinkedInProfile
+)
+
+data class LinkedInProfile(
+    val providerId: String,
+    val accessToken: String,
+    val tokenExpiresAt: String,
+    val loginPlatform: String,
+    val name: String,
+    val firstName: String,
+    val lastName: String,
+    val email: String,
+    val profileImage: String,
+    val linkedinId: String,
+    val userId: String
+)
+
+
+data class TwitterProfile(
+    val apiData: TwitterApiData
+)
+data class TwitterApiData(
+    val username: String,
+    val id: String,
+    val name: String,
+    val profile_image_url: String
+)
+data class PostBodyRequest(val userId:String,val content: String)
+data class PublishPostResponse(
+    val success: Boolean,
+    val result: PublishResult?
+)
+
+data class PublishResult(
+    val id: String
+)
+
+data class SelectableAccount(
+    val id: String,
+    val name: String,
+    val imageUrl: String?,
+    val platform: String,
+    var isSelected: Boolean = false
+)
+
+data class SocialAccount1(
+    val id: String,           // Facebook Page ID
+    val name: String,         // Page name
+    val accessToken: String,  // Page access token
+    val imageUrl: String?,
+    val platform:String?
+    // Page profile image URL
+)
+
+data class PostsResponse(
+    val success: Boolean,
+    val posts: List<Post>
+)
+@SuppressLint("ParcelCreator")
+@Parcelize
+data class Post(
+    val _id: String,
+    val user: String,
+    val platform: String,
+    val pageId: String,
+    val message: String,
+    val mediaUrl: String?,     // null when no media
+    val mediaType: String?,    // null when no media
+    val status: String,
+    val createdAt: String,
+    val updatedAt: String,
+    val __v: Int
+): Parcelable
+

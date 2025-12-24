@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     id("kotlin-kapt") // Required for Hilt
     id("com.google.dagger.hilt.android") // ✅ correct
+    id("kotlin-parcelize")
     kotlin("kapt")
 }
 

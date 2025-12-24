@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
+import android.widget.Toast
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -36,11 +37,13 @@ import androidx.compose.material.TabRowDefaults.Divider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,142 +69,245 @@ import com.wingspan.aimediahub.MainActivity
 import com.wingspan.aimediahub.models.SocialAccount
 import com.wingspan.aimediahub.utils.Prefs
 import com.wingspan.aimediahub.viewmodel.FacebookViewModel
-import com.wingspan.aimediahub.viewmodel.InstagramViewModel
 import kotlin.io.encoding.ExperimentalEncodingApi
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 
 @OptIn(ExperimentalEncodingApi::class)
 @SuppressLint("ContextCastToActivity")
 @Composable
 fun HomeScreen( bottomNavController: NavHostController,
-                rootNavController: NavHostController,pref:Prefs ,viewModel: FacebookViewModel =hiltViewModel(),instamodel: InstagramViewModel=hiltViewModel()) {
+                rootNavController: NavHostController,pref:Prefs,fbDeepLink:String ,twitterDeepLink:String,linkedInDeepLink:String,viewModel: FacebookViewModel =hiltViewModel()) {
 
     var context= LocalContext.current
-
+    val isLoading by viewModel.fbLoading.collectAsState()
     var showWebView by remember { mutableStateOf(false) }
-    var jwtToken by remember { mutableStateOf<String?>(null) }
+    var flatformDisConnect by remember { mutableStateOf("") }
+    Log.d("deep link check","--->${fbDeepLink}...${twitterDeepLink}....${linkedInDeepLink}")
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(
-                WindowInsets.statusBars
-                    .union(WindowInsets.navigationBars)
-                    .asPaddingValues()
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
+    var disconnectDialog by remember { mutableStateOf(false) }
+    //facebook state
+    val fbDisStatus by viewModel.fbDisStatus.collectAsState()
+    val fbPages by viewModel.facebookaccounts.collectAsState()
+    val fbPagesError by viewModel.facebookError.collectAsState()
+
+    val twitterErrorState by viewModel.twitterError.collectAsState()
+
+    LaunchedEffect(fbDisStatus) {
+        fbDisStatus?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+
+        }
+    }
+    LaunchedEffect(fbPagesError) {
+        fbPagesError?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        }
+    }
+    LaunchedEffect(twitterErrorState) {
+        twitterErrorState?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    //deep links
+    LaunchedEffect(fbDeepLink) {
+        if (fbDeepLink == "true") {
+            // Normal flow: load from cache
+            viewModel.getFbPages()
+        }
+    }
+    LaunchedEffect(twitterDeepLink) {
+        if (twitterDeepLink == "true") {
+            // Normal flow: load from cache
+            viewModel.twitterProfile()
+        }
+    }
+
+    LaunchedEffect(linkedInDeepLink) {
+        if (linkedInDeepLink == "true") {
+            // Normal flow: load from cache
+            viewModel.linkedinProfile()
+        }
+    }
+
+    if (isLoading) {
+        // Loader during API call
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    } else {
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(
+                    WindowInsets.statusBars
+                        .union(WindowInsets.navigationBars)
+                        .asPaddingValues()
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            // -------------------- TITLE --------------------
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
             ) {
-                Text(
-                    text = "Hello",
-                    style = MainHeadingBlack
-                )
+                // -------------------- TITLE --------------------
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Hello",
+                        style = MainHeadingBlack
+                    )
 
 
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // ---------------- CONNECTED & NON-CONNECTED ACCOUNTS ----------------
-            Spacer(Modifier.height(20.dp))
-            ConnectedAccountsSection(viewModel,context,pref, onFacebookConnect = {
-                Log.d("token 1234","--${showWebView}")
-                showWebView = true
-
-            })
-            if (showWebView) {
-                connectFacebook(context,pref)
-            }
-            Spacer(Modifier.height(25.dp))
-
-
-            // ---------------- QUICK STATS ----------------
-            Text(
-                text = "Quick Stats",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-
-                StatBox(title = "Posts", value = "25", color = Color.Blue)
-                StatBox(title = "Followers", value = "1.2k", color = Color(0xFF34A853))  // Green
-                StatBox(title = "Engagement", value = "8.4%", color = Color(0xFFFB8C00)) // Orange
-            }
-
-            // ---------------- upcomming POSTS ----------------
-            Spacer(Modifier.height(12.dp))
-            UpcomingPostsSection(onArrowClick = {
-                bottomNavController.navigate("calendar") {
-                    // optional: avoid multiple copies in back stack
-                    launchSingleTop = true
-                    restoreState = true
                 }
-            })
+
+                Spacer(Modifier.height(20.dp))
+
+                // ---------------- CONNECTED & NON-CONNECTED ACCOUNTS ----------------
+                Spacer(Modifier.height(20.dp))
+                ConnectedAccountsSection(viewModel,context,pref, onFacebookConnect = {
+
+                    showWebView = true
+
+                }, onDisconnec = { platform->
+                    Log.d("dis","--->${platform}")
+                    flatformDisConnect=platform
+                    disconnectDialog=true
+
+                },OnConnectionclick={ platform, pageId ,username->
+                    Log.d("OnConnectionClick", "Platform: $platform, PageId: $pageId")
+                    if(platform.equals("Twitter")){
+                        openTwitterProfile(context,username)
+                    }else if(platform.equals("Facebook")){
+                        openFacebookPage(context, pageId)
+                    }
+
+                })
+                if (showWebView) {
+                    connectFacebook(context,pref)
+                }
+                Spacer(Modifier.height(25.dp))
 
 
-            Spacer(Modifier.height(25.dp))
+                // ---------------- QUICK STATS ----------------
+                Text(
+                    text = "Quick Stats",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
 
-            // ---------------- QUICK ACTIONS ----------------
-            Text(
-                text = "Quick Actions",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+                Spacer(Modifier.height(12.dp))
 
-            Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)   // small space only
-            ) {
-                ActionButton(
+                    StatBox(title = "Posts", value = "25", color = Color.Blue)
+                    StatBox(title = "Followers", value = "1.2k", color = Color(0xFF34A853))  // Green
+                    StatBox(title = "Engagement", value = "8.4%", color = Color(0xFFFB8C00)) // Orange
+                }
+
+                // ---------------- upcomming POSTS ----------------
+                Spacer(Modifier.height(12.dp))
+                UpcomingPostsSection(onArrowClick = {
+                    bottomNavController.navigate("calendar") {
+                        // optional: avoid multiple copies in back stack
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                })
+
+
+                Spacer(Modifier.height(25.dp))
+
+                // ---------------- QUICK ACTIONS ----------------
+                Text(
+                    text = "Quick Actions",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)   // small space only
+                ) {
+                    ActionButton(
                         title = "Manual Post",
-                icon = R.drawable.ic_edit,
-                bgColor = Color(0xFFE3F2FF),
-                borderColor = Color(0xFF90CAF9),
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable {
-                        bottomNavController.navigate("calendar") {
-                            // optional: avoid multiple copies in back stack
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                        icon = R.drawable.ic_edit,
+                        bgColor = Color(0xFFE3F2FF),
+                        borderColor = Color(0xFF90CAF9),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                bottomNavController.navigate("calendar") {
+                                    // optional: avoid multiple copies in back stack
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
 
 
-                    }   // Equal width
+                            }   // Equal width
 
-                )
-                ActionButton(
-                    title = "Automation Post",
-                    icon = R.drawable.ic_settings,
-                    bgColor = Color(0xFFFFF4D6),   // Light Yellow
-                    borderColor = Color(0xFFFFE082),
-                    modifier = Modifier.weight(1f)
-                )
+                    )
+                    ActionButton(
+                        title = "Automation Post",
+                        icon = R.drawable.ic_settings,
+                        bgColor = Color(0xFFFFF4D6),   // Light Yellow
+                        borderColor = Color(0xFFFFE082),
+                        modifier = Modifier.weight(1f)
+                            .clickable{
+                                rootNavController.navigate("autoposting_screen") }
+                    )
+                }
+
             }
 
         }
+    }
+    if(disconnectDialog){
+
+        AlertDialog(
+            onDismissRequest = { disconnectDialog = false },
+            title = { Text("Disconnect ${flatformDisConnect}") },
+            text = { Text("Are you sure you want to disconnect your ${flatformDisConnect} account?") },
+            confirmButton = {
+                Log.d("dis dialog","--${flatformDisConnect}")
+                TextButton(
+                    onClick = {
+                        disconnectDialog = false
+                        if(flatformDisConnect.equals("Facebook")){
+                            viewModel.setFbDisconnected()
+                        }else if(flatformDisConnect.equals("Twitter")){
+                            viewModel.setTwitterDisconnected()
+                        }else if(flatformDisConnect.equals("LinkedIn")){
+                            viewModel.setLinkedDisconnected()
+                        }
+
+                    }
+                ) {
+                    Text("Yes")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { disconnectDialog = false }) {
+                    Text("No")
+                }
+            }
+        )
 
     }
+
 
 }
 @Composable
@@ -449,12 +555,13 @@ fun ActionButton(title: String, icon: Int,
 @Composable
 fun ConnectedAccountsSection(
     viewModel: FacebookViewModel = hiltViewModel(),
-    context: Context, pref: Prefs, onFacebookConnect: () -> Unit
+    context: Context, pref: Prefs, onFacebookConnect: () -> Unit,onDisconnec:(String)->Unit,OnConnectionclick:(String,String,String)->Unit
 ) {
 
     val accounts = viewModel.facebookaccounts.collectAsState()
     val twitterData=viewModel.twitterProfile.collectAsState()
     val instagramData =viewModel.instaProfile.collectAsState()
+    val linkedInData=viewModel.linkedInProfile.collectAsState()
 
 
     Log.d("data","---${accounts}....${twitterData}")
@@ -466,6 +573,7 @@ fun ConnectedAccountsSection(
 
     var facebookAccounts = accounts.value.map { page ->
         SocialAccount(
+            id=page.id,
             platform = "Facebook",
             connected = true,
             imageUrl = page.imageUrl,
@@ -475,6 +583,7 @@ fun ConnectedAccountsSection(
     val twitterAccount = twitterData.value?.let {
         Log.d("data","---${it.accessToken}....${it.imageUrl}")
         SocialAccount(
+            id=it.id,
             platform = "Twitter",
             connected = true,
             imageUrl = it.imageUrl,
@@ -484,7 +593,19 @@ fun ConnectedAccountsSection(
     val instagramAccount = instagramData.value?.let {
         Log.d("data","---${it.accessToken}....${it.imageUrl}")
         SocialAccount(
+            id=it.id,
             platform = "Instagram",
+            connected = true,
+            imageUrl = it.imageUrl,
+            accessToken = it.accessToken
+        )
+    }
+
+    val linkedInAccount = linkedInData.value?.let {
+        Log.d("data","---${it.accessToken}....${it.imageUrl}")
+        SocialAccount(
+            id=it.id,
+            platform = "LinkedIn",
             connected = true,
             imageUrl = it.imageUrl,
             accessToken = it.accessToken
@@ -496,6 +617,7 @@ fun ConnectedAccountsSection(
     val facebookDisconnectOnly = if (facebookAccounts.isNotEmpty()) {
         listOf(
             SocialAccount(
+                id= 0.toString(),
                 platform = "Facebook",
                 connected = true,
                 showDisconnectOnly = true // ✅ special behavior
@@ -504,15 +626,19 @@ fun ConnectedAccountsSection(
     } else {
         listOf(
             SocialAccount(
+                id= 0.toString(),
                 platform = "Facebook",
                 connected = false
             )
         )
     }
 
+
+
     val twitterDisconnectOnly = if (twitterAccount!= null) {
         listOf(
             SocialAccount(
+                id= 0.toString(),
                 platform = "Twitter",
                 connected = true,
                 showDisconnectOnly = true // ✅ special behavior
@@ -521,7 +647,28 @@ fun ConnectedAccountsSection(
     } else {
         listOf(
             SocialAccount(
+                id= 0.toString(),
                 platform = "Twitter",
+                connected = false
+            )
+        )
+    }
+
+
+    val linkedInDisconnectOnly = if (linkedInAccount!= null) {
+        listOf(
+            SocialAccount(
+                id= 0.toString(),
+                platform = "LinkedIn",
+                connected = true,
+                showDisconnectOnly = true // ✅ special behavior
+            )
+        )
+    } else {
+        listOf(
+            SocialAccount(
+                id= 0.toString(),
+                platform = "LinkedIn",
                 connected = false
             )
         )
@@ -530,6 +677,7 @@ fun ConnectedAccountsSection(
     val instaDisconnectOnly = if (instagramAccount!= null) {
         listOf(
             SocialAccount(
+                id= 0.toString(),
                 platform = "Instagram",
                 connected = true,
                 showDisconnectOnly = true // ✅ special behavior
@@ -538,6 +686,7 @@ fun ConnectedAccountsSection(
     } else {
         listOf(
             SocialAccount(
+                id= 0.toString(),
                 platform = "Instagram",
                 connected = false
             )
@@ -546,15 +695,14 @@ fun ConnectedAccountsSection(
     // Other social accounts (single entry)
 
     var otherAccounts = listOf(
-        SocialAccount("LinkedIn"),
         SocialAccount("YouTube")
     )
 
     val connectedAccounts = facebookAccounts +
-            listOfNotNull(twitterAccount)+
+            listOfNotNull(twitterAccount)+listOfNotNull(linkedInAccount)
             listOfNotNull(instagramAccount)
 
-    val nonConnectedAccounts = facebookDisconnectOnly +twitterDisconnectOnly+instaDisconnectOnly+ otherAccounts
+    val nonConnectedAccounts = facebookDisconnectOnly +twitterDisconnectOnly+instaDisconnectOnly+linkedInDisconnectOnly+ otherAccounts
 
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -579,6 +727,12 @@ fun ConnectedAccountsSection(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xFFE7F0FF))
+                            .clickable{
+                                Log.d("TAG", "Page ID: $account.id")
+                                OnConnectionclick(account.platform,account.id,
+                                    account.accessToken.toString()
+                                )
+                            }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Icon(
@@ -620,96 +774,39 @@ fun ConnectedAccountsSection(
                         onDisconnectClick = {
                             // ✅ ONLY for connected ❌
                             if (account.platform == "Facebook") {
-                                logoutFacebook(viewModel)
+                                onDisconnec(account.platform.toString())
+
                             }else if(account.platform == "Twitter"){
-                                logoutTwitter(viewModel)
+                               onDisconnec(account.platform.toString())
                             }else if(account.platform=="Instagram"){
                                 logoutInstagram(viewModel)
+                            }else if(account.platform=="LinkedIn"){
+                                onDisconnec(account.platform.toString())
                             }
                         },
                         onConnectClick = {
                             // Start login/connect flow
                             if (account.platform == "Facebook") {
                                onFacebookConnect()
-//                                LoginManager.getInstance().logInWithReadPermissions(
-//                                    activity,
-//                                    listOf(
-//                                        "public_profile",
-//                                        "email",
-//                                        "pages_show_list",
-//                                        "pages_manage_posts",
-//                                        "pages_read_engagement"
-//                                    )
-//                                )
-//                                // Register callback once
-//                                LoginManager.getInstance().registerCallback(
-//                                    callbackManager,
-//                                    object : FacebookCallback<LoginResult> {
-//                                        override fun onSuccess(result: LoginResult) {
-//
-//                                            Log.d("FB_LOGIN", "Login success callback hit")
-//                                            val permissions = result.accessToken?.permissions ?: emptySet()
-//                                            Log.d("FB_LOGIN", "Permissions = $permissions")
-//
-//                                            // ✅ Request publish only if missing
-//                                            if (!permissions.contains("pages_manage_posts")) {
-//
-//                                                // ❗IMPORTANT: delay helps avoid Facebook SDK crash
-//                                                Handler(Looper.getMainLooper()).postDelayed({
-//
-//                                                    LoginManager.getInstance().logInWithPublishPermissions(
-//                                                        activity,
-//                                                        listOf("pages_manage_posts")
-//                                                    )
-//
-//                                                }, 800)
-//
-//                                                return
-//                                            }
-//                                            val token = result.accessToken?.token
-//
-//                                            //get longlikev token and call getfbpages fun in viewmodel
-//                                            //own account
-////                                            viewModel.getLongLiveToken("1109850424381007","a8d1e54105ae4e089cc97e5d72e4df53",
-////                                                token.toString()
-////                                            )
-//
-//                                            //company account
-////                                            viewModel.getLongLiveToken("1157175713250946","04f63b558e0932cea6df31a46b876ad6",
-////                                                token.toString()
-////                                            )
-//
-//                                            Log.d("FB_LOGIN", "Token = $token")
-//                                        }
-//
-//                                        override fun onCancel() {
-//                                            Log.d("FB_LOGIN", "Login canceled")
-//                                        }
-//
-//                                        override fun onError(error: FacebookException) {
-//                                            Log.e("FB_LOGIN", "Error: ${error.message}")
-//                                        }
-//                                    })
-
-
-
                             }
                             if(account.platform=="Instagram"){
-                                //i get this from get token instagram
-                                val longlivedToken = "IGAATWB2zHKD1BZAGJlYUp2akY1TG1fa3pUeU80MUJHbC1XNFY5aWRabWdEaV9RRDZATbDRkeDNEa0NET19JR0dkSkNReTZARYjhVMnhqU1NkYVB2VUNGZAjZAXUHFEcEs4WXVhcjRqTkJJYXJGQTlvb2Y1dlBtbnpIdjdWbnRMY1RXawZDZD"
-                                viewModel.fetchUserProfileInsta(longlivedToken)
-
-
+                                val userId = pref.getUserID()
+                                val loginUrl = "https://automatedpostingbackend.onrender.com/auth/twitter?userId=${userId}&platform=android"
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
+                                context.startActivity(intent)
                             }
                             if(account.platform=="Twitter"){
                                 val userId = pref.getUserID()
-                                Log.d("my id data","---${userId}")
                                 val loginUrl = "https://automatedpostingbackend.onrender.com/auth/twitter?userId=${userId}&platform=android"
-
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
                                 context.startActivity(intent)
 
-                                // viewModel.fetchUserProfile("1998625018910326784-B4LG6Zus5ZZp5VcdQJxMmnWGkldIWb","5f05HDr3SA95rnegFQjqwCJeJAafq4bcW4G2zT6nyvyUy")
+                            }
+                            if(account.platform=="LinkedIn"){
+                                val userId = pref.getUserID()
+                                val loginUrl = "https://automatedpostingbackend.onrender.com/auth/linkedin?userId=${userId}&platform=android"
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
+                                context.startActivity(intent)
                             }
                         }
                     )
@@ -742,16 +839,9 @@ fun getIcon(platform: String): Int {
     }
 }
 
-fun logoutFacebook(viewModel: FacebookViewModel) {
-    LoginManager.getInstance().logOut()
 
-    viewModel.setFbDisconnected()      // ✅ clears UI instantly
 
-    Log.d("FB_LOGOUT", "All Facebook accounts cleared")
-}
-fun logoutTwitter(viewModel: FacebookViewModel){
-    viewModel.setTwitterDisconnected()
-}
+
 fun logoutInstagram(viewModel: FacebookViewModel){
     viewModel.setInstagramDisconnected()
 }
@@ -761,6 +851,63 @@ fun logoutInstagram(viewModel: FacebookViewModel){
 @Composable
 fun AnalyticsScreen() = ScreenBase("Analytics Screen")
 
+
+fun openFacebookPage(context: Context, pageId: String) {
+    val TAG = "FacebookOpen"
+
+    val webUrl = "https://www.facebook.com/profile.php?id=$pageId"
+
+    Log.d(TAG, "Opening Facebook Page")
+    Log.d(TAG, "Page ID: $pageId")
+    Log.d(TAG, "URL: $webUrl")
+
+    try {
+        // Check if Facebook app is installed
+        context.packageManager.getPackageInfo("com.facebook.katana", 0)
+
+        Log.d(TAG, "Facebook app installed → opening inside app")
+
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)).apply {
+            setPackage("com.facebook.katana")   // 🔥 Force Facebook App
+        }
+        context.startActivity(intent)
+
+    } catch (e: Exception) {
+        Log.d(TAG, "Facebook app not installed → opening browser")
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)))
+    }
+}
+fun openTwitterProfile(context: Context, userName: String) {
+    val TAG = "TwitterOpen"
+
+    // Web URL fallback
+    val webUrl = "https://twitter.com/$userName"
+
+    Log.d(TAG, "Opening Twitter Profile")
+    Log.d(TAG, "Username: $userName")
+    Log.d(TAG, "URL: $webUrl")
+
+    try {
+        // Check if Twitter (X) app is installed
+        context.packageManager.getPackageInfo("com.twitter.android", 0)
+
+        Log.d(TAG, "Twitter app installed → opening inside app")
+
+        // Twitter deep link
+        val intent = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse("twitter://user?screen_name=$userName")
+        ).apply {
+            setPackage("com.twitter.android") // 🔥 Force Twitter App
+        }
+
+        context.startActivity(intent)
+
+    } catch (e: Exception) {
+        Log.d(TAG, "Twitter app not installed → opening browser")
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)))
+    }
+}
 
 
 

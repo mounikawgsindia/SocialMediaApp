@@ -11,22 +11,26 @@ import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.core.view.WindowCompat
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.facebook.CallbackManager
 import com.wingspan.aimediahub.models.OnBoardModel
+import com.wingspan.aimediahub.models.Post
 import com.wingspan.aimediahub.ui.theme.AiMediaHubTheme
 import com.wingspan.aimediahub.ui.theme.bottonpages.AppNavigation
 import com.wingspan.aimediahub.ui.theme.AutoOnBoardScreen
 import com.wingspan.aimediahub.ui.theme.CreatePostScreen
-import com.wingspan.aimediahub.ui.theme.DayScreen
 import com.wingspan.aimediahub.ui.theme.auth.LoginScreen
 import com.wingspan.aimediahub.ui.theme.auth.RegistrationScreen
 import com.wingspan.aimediahub.ui.theme.AIChatPage
+import com.wingspan.aimediahub.ui.theme.ViewPostPageScreen
 import com.wingspan.aimediahub.utils.Prefs
 import dagger.hilt.android.AndroidEntryPoint
+import java.time.LocalDate
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -36,6 +40,11 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var prefs : Prefs
+    private var navigateToMainFromFbDeepLink = false
+    private var navigateToMainFromTwitterDeepLink = false
+    private var navigationToMainFromLinkedInDeepLink = false
+
+
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,12 +55,17 @@ class MainActivity : ComponentActivity() {
         handleDeepLink(intent)
         setContent {
             AiMediaHubTheme {
-
-                   // MainApp()
-                MainApp(prefs)
+                MainApp(prefs,
+                    navigateToMainFromFbDeepLink,
+                    navigateToMainFromTwitterDeepLink,navigationToMainFromLinkedInDeepLink)
             }
         }
 
+    }
+    //Using onNewIntent() ensures it works even if the activity is already running.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleDeepLink(intent)
     }
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -60,31 +74,44 @@ class MainActivity : ComponentActivity() {
 
         callbackManager.onActivityResult(requestCode, resultCode, data)  // ✅ FORWARD
     }
-    // 🔹 ADD THIS FUNCTION HERE
+
+
     private fun handleDeepLink(intent: Intent?) {
         val uri = intent?.data ?: return
 
-        if (uri.scheme == "com.wingspan.aimediahub" &&
-            uri.host == "login-success") {
+        if (uri.scheme == "com.wingspan.aimediahub") {
+            when (uri.host) {
+                "login-success" -> {
+                    // Facebook callback
+                    navigateToMainFromFbDeepLink = true
+                    Log.d("FB_CALLBACK", "Facebook deep link received")
+                    // Optionally parse token: val token = uri.getQueryParameter("token")
+                }
+                "twitter-callback" -> {
+                    // Twitter callback
+                    navigateToMainFromTwitterDeepLink = true
 
-            val token = uri.getQueryParameter("token")
-
-            Log.d("FB_CALLBACK", "JWT token = $token")
-
-            if (!token.isNullOrEmpty()) {
-               Log.d("token","---data${token}")
+                    Log.d("TWITTER_CALLBACK", "linkedin")
+                    // Save tokens or send to ViewModel for API
+                }
+                "linkedin-callback" ->{
+                    navigationToMainFromLinkedInDeepLink = true
+                }
             }
         }
     }
 }
 
+
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun MainApp(prefs: Prefs) {
+fun MainApp(prefs: Prefs ,fbDeepLink: Boolean,
+            twitterDeepLink: Boolean,linkedInDeepLink: Boolean) {
     val rootNavController = rememberNavController() // root navController
 
     val startDestination = remember {
         when {
+            fbDeepLink || twitterDeepLink || linkedInDeepLink-> "main"  // deep link triggers main screen
             prefs.isFirstTime() -> "onboarding"
             prefs.isLoggedIn() -> "main"
             else -> "login"
@@ -143,16 +170,16 @@ fun MainApp(prefs: Prefs) {
 
         // ✅ Main App Screen (Bottom Nav starts here)
         composable("main") {
-            AppNavigation(rootNavController,prefs)
+            AppNavigation(rootNavController,prefs, fbDeepLink = fbDeepLink, twitterDeepLink = twitterDeepLink,linkedInDeepLink=linkedInDeepLink)
         }
         // ✅ Full-screen Create Post page (outside Bottom Navigation)
         composable("create_post_screen") {
             CreatePostScreen(rootNavController,prefs)
         }
 
-//        composable("dayscreen") {
-//            DayScreen(rootNavController)
-//        }
+        composable("autoposting_screen") {
+            AutoPostingScreen(rootNavController,prefs)
+        }
 
         composable("aichatpage/{topic}") { backStackEntry ->
             val topic = backStackEntry.arguments?.getString("topic") ?: ""
@@ -161,6 +188,27 @@ fun MainApp(prefs: Prefs) {
                 navController = rootNavController
             )
         }
+        composable(
+            route = "view_posts/{date}",
+            arguments = listOf(
+                navArgument("date") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+
+            val dateString = backStackEntry.arguments?.getString("date") ?: return@composable
+            val selectedDate = LocalDate.parse(dateString)
+
+            val posts =
+                rootNavController.previousBackStackEntry
+                    ?.savedStateHandle
+                    ?.get<List<Post>>("day_posts") ?: emptyList()
+
+            ViewPostPageScreen(
+                selectedDate = selectedDate,
+                posts = posts,prefs,rootNavController
+            )
+        }
+
 
 
     }
