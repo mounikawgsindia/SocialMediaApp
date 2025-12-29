@@ -57,14 +57,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PaintingStyle.Companion.Stroke
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -94,8 +100,13 @@ fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: Fac
     val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
 
 
-    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
-    var selectedTime by remember { mutableStateOf<LocalTime?>(null) }
+//    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+//    var selectedTime by remember { mutableStateOf<LocalTime?>(null) }
+
+    var startDate by remember { mutableStateOf<LocalDate?>(null) }
+    var endDate by remember { mutableStateOf<LocalDate?>(null) }
+    val selectedTimes = remember { mutableStateListOf<LocalTime>() }
+
 
 
     var showSheet by remember { mutableStateOf(false) }
@@ -193,20 +204,32 @@ fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: Fac
                 val message = postText
                 if(!message.isEmpty()){
                     if (currentfbPages.isNotEmpty()) {
-                        currentfbPages.forEach { page ->
-                            val sheduleTime =
-                                if (selectedDate != null && selectedTime != null) {
-                                    "${selectedDate!!.format(DateTimeFormatter.ISO_DATE)} " +
-                                            selectedTime!!.format(DateTimeFormatter.ofPattern("HH:mm"))
-                                } else {
-                                    ""
-                                }
+//                        currentfbPages.forEach { page ->
+//                            val sheduleTime =
+//                                if (selectedDate != null && selectedTime != null) {
+//                                    "${selectedDate!!.format(DateTimeFormatter.ISO_DATE)} " +
+//                                            selectedTime!!.format(DateTimeFormatter.ofPattern("HH:mm"))
+//                                } else {
+//                                    ""
+//                                }
+//
+//                            viewModel.publishFacebookPost(
+//                                pageId = page.id.toString(),
+//                                sheduleTime=sheduleTime,
+//                                message = message, imageUri = selectedImageUri)
+//                        }
+                        viewModel.publishFacebookPost(
+                            pageIds = currentfbPages.map { it.id.toString() },
+                            message = postText,
+                            times = selectedTimes.map {
+                                it.format(DateTimeFormatter.ofPattern("HH:mm"))
+                            },
+                            startDate = startDate.toString(),
+                            endDate = endDate.toString(),
+                            imageUri = selectedImageUri
+                        )
 
-                            viewModel.publishFacebookPost(
-                                pageId = page.id,
-                                sheduleTime=sheduleTime,
-                                message = message, imageUri = selectedImageUri)
-                        }
+
 
                     }
                     if(twitterProfile!=null){
@@ -239,11 +262,16 @@ fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: Fac
             },onRemoveInstagram={
                 instaProfile=null
             },
-            onDateTimeSelected = { date, time ->
-                selectedDate = date
-                selectedTime = time
-                Log.d("DateTimeSelected", "Date: $date, Time: $time")
-            }
+
+        )
+        ScheduleSection(
+            startDate = startDate,
+            endDate = endDate,
+            times = selectedTimes,
+            onStartDateSelect = { startDate = it },
+            onEndDateSelect = { endDate = it },
+            onAddTime = { selectedTimes.add(it) },
+            onRemoveTime = { selectedTimes.remove(it) }
         )
 
         Divider(color = Color(0xFFE0E0E0))
@@ -322,6 +350,8 @@ fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: Fac
 
     }
 }
+
+
 
 @Composable
 fun GenerateAIDialog(
@@ -453,7 +483,7 @@ fun DateAndPlatformRow(
     context: Context,
     onRemoveTwitter: () -> Unit,
     onRemoveInstagram: () -> Unit,
-    onDateTimeSelected: (LocalDate, LocalTime) -> Unit
+
 ) {
 
     var selectedDateTime by remember {
@@ -472,55 +502,15 @@ fun DateAndPlatformRow(
     ) {
 
 
+
         // ---------------------- DATE & TIME PICKER ----------------------
-        Box(
-            modifier = Modifier
-                .background(Color.White, RoundedCornerShape(8.dp))
-                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
-                .clickable {
-                    // <-- REPLACE YOUR EXISTING CLICKABLE BLOCK WITH THIS
-                    val datePicker = DatePickerDialog(
-                        context,
-                        { _, year, month, dayOfMonth ->
+        GradientDateTimePickerBox(
+            formattedDate = formattedDate,
+            selectedDateTime = selectedDateTime,
 
-                            TimePickerDialog(
-                                context,
-                                { _, hour, minute ->
-                                    selectedDateTime = LocalDateTime.of(
-                                        year,
-                                        month + 1,
-                                        dayOfMonth,
-                                        hour,
-                                        minute
-                                    )
+            modifier = Modifier.fillMaxWidth() // optional, set width as needed
+        )
 
-                                    // Pass selected date and time to parent
-                                    onDateTimeSelected(
-                                        selectedDateTime.toLocalDate(),
-                                        selectedDateTime.toLocalTime()
-                                    )
-
-                                },
-                                selectedDateTime.hour,
-                                selectedDateTime.minute,
-                                false
-                            ).show()
-                        },
-                        selectedDateTime.year,
-                        selectedDateTime.monthValue - 1,
-                        selectedDateTime.dayOfMonth
-                    )
-
-                    datePicker.datePicker.minDate = System.currentTimeMillis()
-                    datePicker.show()
-                }
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        ) {
-            Text(
-                text = formattedDate,
-                fontWeight = FontWeight.Medium
-            )
-        }
 
 
         Spacer(Modifier.height(12.dp))
@@ -538,7 +528,7 @@ fun DateAndPlatformRow(
                     icon = R.drawable.ic_fb,
                     iconTint = Color(0xFF1877F2),
                     imageUrl = page.imageUrl,
-                    label = page.name,
+                    label = page.name.toString(),
                     onRemove = {
                         val updated =
                             currentPages.filter { it.id != page.id }.toMutableList()
@@ -554,7 +544,7 @@ fun DateAndPlatformRow(
                         icon = R.drawable.ic_twitter,
                         iconTint = Color(0xFF1DA1F2),
                         imageUrl = tp.imageUrl,
-                        label = tp.name,
+                        label = tp.name.toString(),
                         onRemove = onRemoveTwitter
                     )
                 }
@@ -565,7 +555,7 @@ fun DateAndPlatformRow(
                         icon = R.drawable.ic_linkedin,
                         iconTint = Color(0xFF1DA1F2),
                         imageUrl = tp.imageUrl,
-                        label = tp.name,
+                        label = tp.name.toString(),
                         onRemove = onRemoveTwitter
                     )
                 }
@@ -578,7 +568,7 @@ fun DateAndPlatformRow(
                         icon = R.drawable.ic_instagram,
                         iconTint = Color(0xFFDD2A7B),
                         imageUrl = ip.imageUrl,
-                        label = ip.name,
+                        label = ip.name.toString(),
                         onRemove = onRemoveInstagram
                     )
                 }
@@ -681,33 +671,33 @@ fun PostContentSection(text: String, selectedImageUri: Uri?,selectedVideoUri:Uri
             )
         }
 
-        Spacer(Modifier.height(24.dp))
-
-        // Content Type Row
-        Row(verticalAlignment = Alignment.CenterVertically) {
-
-            Icon(
-                painter = painterResource(R.drawable.ic_fb),
-                contentDescription = "",
-                modifier = Modifier.size(22.dp)
-            )
-
-            Spacer(Modifier.width(8.dp))
-
-            Text("Content type", fontSize = 14.sp)
-
-            Spacer(Modifier.weight(1f))
-
-            Icon(
-                painter = painterResource(R.drawable.ic_grid),
-                contentDescription = "",
-                modifier = Modifier.size(18.dp)
-            )
-
-            Spacer(Modifier.width(6.dp))
-
-            Text("Post", color = Color.Gray)
-        }
+//        Spacer(Modifier.height(24.dp))
+//
+//        // Content Type Row
+//        Row(verticalAlignment = Alignment.CenterVertically) {
+//
+//            Icon(
+//                painter = painterResource(R.drawable.ic_fb),
+//                contentDescription = "",
+//                modifier = Modifier.size(22.dp)
+//            )
+//
+//            Spacer(Modifier.width(8.dp))
+//
+//            Text("Content type", fontSize = 14.sp)
+//
+//            Spacer(Modifier.weight(1f))
+//
+//            Icon(
+//                painter = painterResource(R.drawable.ic_grid),
+//                contentDescription = "",
+//                modifier = Modifier.size(18.dp)
+//            )
+//
+//            Spacer(Modifier.width(6.dp))
+//
+//            Text("Post", color = Color.Gray)
+//        }
 
         Spacer(Modifier.height(18.dp))
 
@@ -830,8 +820,164 @@ internal fun MediaCard(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+fun GradientDateTimePickerBox(
+    formattedDate: String,
+    selectedDateTime: LocalDateTime,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val LightSkyBlue = Color(0xFF87CEFA)
+    val SoftLavender = Color(0xFFE6E6FA)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .background(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(LightSkyBlue, SoftLavender)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = formattedDate,
+            color = Color.Black,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+fun ScheduleSection(
+    startDate: LocalDate?,
+    endDate: LocalDate?,
+    times: List<LocalTime>,
+    onStartDateSelect: (LocalDate) -> Unit,
+    onEndDateSelect: (LocalDate) -> Unit,
+    onAddTime: (LocalTime) -> Unit,
+    onRemoveTime: (LocalTime) -> Unit
+) {
+    val context = LocalContext.current
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
+    val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+    Column(modifier = Modifier.padding(14.dp)) {
+
+        Text("Schedule", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+
+        Spacer(Modifier.height(12.dp))
+
+        // -------- START DATE --------
+        ScheduleDateBox(
+            label = "Start Date",
+            value = startDate?.format(dateFormatter) ?: "Select",
+            onClick = {
+                DatePickerDialog(
+                    context,
+                    { _, y, m, d -> onStartDateSelect(LocalDate.of(y, m + 1, d)) },
+                    LocalDate.now().year,
+                    LocalDate.now().monthValue - 1,
+                    LocalDate.now().dayOfMonth
+                ).show()
+            }
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        // -------- END DATE --------
+        ScheduleDateBox(
+            label = "End Date",
+            value = endDate?.format(dateFormatter) ?: "Select",
+            onClick = {
+                DatePickerDialog(
+                    context,
+                    { _, y, m, d -> onEndDateSelect(LocalDate.of(y, m + 1, d)) },
+                    LocalDate.now().year,
+                    LocalDate.now().monthValue - 1,
+                    LocalDate.now().dayOfMonth
+                ).show()
+            }
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        // -------- TIMES --------
+        Text("Times", fontWeight = FontWeight.Medium)
+
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(times.size) { index ->
+                TimeChip(
+                    time = times[index].format(timeFormatter),
+                    onRemove = { onRemoveTime(times[index]) }
+                )
+            }
+
+            item {
+                AddTimeChip {
+                    TimePickerDialog(
+                        context,
+                        { _, h, m -> onAddTime(LocalTime.of(h, m)) },
+                        10,
+                        0,
+                        true
+                    ).show()
+                }
+            }
+        }
+    }
+}
 
 
+@Composable
+fun ScheduleDateBox(label: String, value: String, onClick: () -> Unit) {
+    Column {
+        Text(label, fontSize = 12.sp, color = Color.Gray)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
+                .clickable { onClick() }
+                .padding(12.dp)
+        ) {
+            Text(value)
+        }
+    }
+}
 
+@Composable
+fun TimeChip(time: String, onRemove: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .background(Color(0xFFE7F0FF), RoundedCornerShape(20.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(time)
+            Spacer(Modifier.width(6.dp))
+            Icon(
+                painter = painterResource(R.drawable.ic_close),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(14.dp)
+                    .clickable { onRemove() }
+            )
+        }
+    }
+}
 
+@Composable
+fun AddTimeChip(onAdd: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .border(1.dp, Color(0xFF1976D2), RoundedCornerShape(20.dp))
+            .clickable { onAdd() }
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+    ) {
+        Text("+ Add Time", color = Color(0xFF1976D2))
+    }
+}
 

@@ -1,6 +1,7 @@
 package com.wingspan.aimediahub.repository
 
 import android.util.Log
+import com.google.gson.Gson
 import com.wingspan.aimediahub.models.DisconnectRequest
 import com.wingspan.aimediahub.models.LinkedInProfileResponse
 import com.wingspan.aimediahub.models.PageResponse
@@ -43,51 +44,89 @@ class FacebookRepository @Inject constructor(private val apiCall:ApiServices,
             apiCall = { apiCall.fbDisconnect(request) },
             errorKey = "message"
         )
+
     fun publishFacebookPost(
-        pageId: String,
+        pageIds: List<String>,
         message: String,
-        scheduleTime: String?, // optional
+        times: List<String>,
+        startDate: String,
+        endDate: String,
         mediaFile: File? = null
     ): Flow<Resource<PublishPostResponse>> = flow {
 
         emit(Resource.Loading())
 
         try {
-            // Create RequestBody for text fields
-            val pageIdBody = pageId.toRequestBody("text/plain".toMediaType())
-            val userIdBody = pref.getUserID()?.toRequestBody("text/plain".toMediaType())
-            val messageBody = message.toRequestBody("text/plain".toMediaType())
-            val scheduleTimeBody = scheduleTime?.toRequestBody("text/plain".toMediaType())
+            // Convert List -> JSON array string
+            val pageIdsJson = Gson().toJson(pageIds)
+            val timesJson = Gson().toJson(times)
 
-            Log.d("PublishFBPost", "pageId: $pageId, userId: ${pref.getUserID()}, message: $message, scheduleTime: $scheduleTime")
-            Log.d("PublishFBPost", "mediaFile: ${mediaFile?.absolutePath}")
+            // RequestBody creation
+            val platformBody =
+                "facebook".toRequestBody("text/plain".toMediaType())
 
-            // Create MultipartBody.Part for media if exists
+            val userIdBody =
+                pref.getUserID()!!.toRequestBody("text/plain".toMediaType())
+
+            val messageBody =
+                message.toRequestBody("text/plain".toMediaType())
+
+            val pageIdsBody =
+                pageIdsJson.toRequestBody("text/plain".toMediaType())
+
+            val timesBody =
+                timesJson.toRequestBody("text/plain".toMediaType())
+
+            val startDateBody =
+                startDate.toRequestBody("text/plain".toMediaType())
+
+            val endDateBody =
+                endDate.toRequestBody("text/plain".toMediaType())
+
+            Log.d("PublishFBPost", """
+            platform: facebook
+            userId: ${pref.getUserID()}
+            message: $message
+            pageIds: $pageIdsJson
+            times: $timesJson
+            startDate: $startDate
+            endDate: $endDate
+        """.trimIndent())
+
+            // Media part
             val mediaPart = mediaFile?.let {
-                val reqFile = it.asRequestBody("multipart/form-data".toMediaType())
-                MultipartBody.Part.createFormData("media", it.name, reqFile)
+                val reqFile = it.asRequestBody("image/*".toMediaType())
+                MultipartBody.Part.createFormData(
+                    "media",
+                    it.name,
+                    reqFile
+                )
             }
 
             val response = apiCall.publishFacebookPost(
-                pageId = pageIdBody,
+                platform = platformBody,
                 userId = userIdBody,
                 message = messageBody,
-                scheduleTime = scheduleTimeBody,
+                pageIds = pageIdsBody,
+                times = timesBody,
+                startDate = startDateBody,
+                endDate = endDateBody,
                 media = mediaPart
             )
 
-            Log.d("PublishFBPost", "response code: ${response.code()}, response body: ${response.body()}")
+            Log.d(
+                "PublishFBPost",
+                "response code: ${response.code()}, body: ${response.body()}"
+            )
 
             if (response.isSuccessful && response.body() != null) {
                 emit(Resource.Success(response.body()!!))
             } else {
                 val errorMsg = response.errorBody()?.string() ?: "Unknown error"
-                Log.d("PublishFBPost", "error: $errorMsg")
                 emit(Resource.Error(errorMsg))
             }
 
         } catch (e: Exception) {
-            Log.d("PublishFBPost", "exception: ${e.localizedMessage}")
             emit(Resource.Error(e.localizedMessage ?: "Something went wrong"))
         }
 
@@ -95,6 +134,7 @@ class FacebookRepository @Inject constructor(private val apiCall:ApiServices,
 
 
     fun getPostedApi(): Flow<Resource<PostsResponse>> =
+
         safeApiCall(
 
             apiCall = { apiCall.getPostedApi(pref.getUserID().toString()) },
@@ -107,6 +147,13 @@ class FacebookRepository @Inject constructor(private val apiCall:ApiServices,
         apiCall = { apiCall.twitterProfile(pref.getUserID().toString()) },
         errorKey = "message"
     )
+
+    fun twitterDisconnect(request: DisconnectRequest): Flow<Resource<ResponseData>> =
+        safeApiCall(
+
+            apiCall = { apiCall.twitterDisconnect(request) },
+            errorKey = "message"
+        )
 
     //linked
     fun linkedInProfile(): Flow<Resource<LinkedInProfileResponse>> =
@@ -123,7 +170,12 @@ class FacebookRepository @Inject constructor(private val apiCall:ApiServices,
             errorKey = "message"
         )
 
-
+    //post
+//    fun linkedInPost(): Flow<Resource<LinkedInProfileResponse>> =
+//        safeApiCall(
+//            apiCall = { apiCall.linkedInPost(pref.getUserID().toString()) },
+//            errorKey = "message"
+//        )
 
 
     /**

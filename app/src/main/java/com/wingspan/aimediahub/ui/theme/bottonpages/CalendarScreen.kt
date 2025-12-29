@@ -56,12 +56,14 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.wingspan.aimediahub.models.Post
 import com.wingspan.aimediahub.ui.theme.DailyCalendarGrid
+import com.wingspan.aimediahub.ui.theme.LightSkyBlue
 import com.wingspan.aimediahub.ui.theme.WeeklyCalendarGrid
 import com.wingspan.aimediahub.utils.NetworkUtils
 import com.wingspan.aimediahub.utils.Prefs
@@ -94,10 +96,6 @@ fun CalendarScreen(
     var weekStart by remember {
         mutableStateOf(LocalDate.now().with(DayOfWeek.MONDAY))
     }
-    // This is your list stored for calendar usage
-    val calendarPostList = remember(postData) {
-        postData
-    }
 
     //count date
     val postCountByDate = remember(postData) {
@@ -112,15 +110,10 @@ fun CalendarScreen(
     }
 
 
-    Log.d("calender list","--->${calendarPostList}")
+    Log.d("calender list","--->${postCountByDate}")
     val daysOfWeek = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
 
-    val sampleDailyPosts = mapOf(
-        9 to "Morning Post",
-        12 to "Lunch Campaign",
-        15 to "Product Reel",
-        18 to "Evening Story"
-    )
+
 
     LaunchedEffect(Unit) {
         if(NetworkUtils.isNetworkAvailable(context =context )){
@@ -147,13 +140,10 @@ fun CalendarScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(top=26.dp, start = 16.dp, end = 16.dp)
         ) {
 
             CalendarTopBar()
-            // ✅ Replace CalendarTopBar with MonthSelector
-
-            MemberRow()
 
             MonthSelector(
                 currentMonth = currentMonth,
@@ -203,34 +193,100 @@ fun CalendarScreen(
                 }
 
                 CalendarViewMode.WEEK -> {
-                    val samplePosts = mapOf(
-                        LocalDate.of(2025, 12, 15) to listOf(9 to "Meeting", 14 to "Call"),
-                        LocalDate.of(2025, 12, 16) to listOf(11 to "Design Review")
-                    )
+                    // 🔹 Prepare posts for the current week
+                    // 🔹 Prepare posts for the current week (CORRECT MODEL)
+                    val postsPerWeek: Map<LocalDate, Map<Int, List<Post>>> =
+                        remember(postData, weekStart) {
+
+                            val weekDates = (0..6).map { weekStart.plusDays(it.toLong()) }
+
+                            weekDates.associateWith { date ->
+                                postData
+                                    ?.filter {
+                                        Instant.parse(it.createdAt)
+                                            .atZone(ZoneId.systemDefault())
+                                            .toLocalDate() == date
+                                    }
+                                    ?.groupBy {
+                                        Instant.parse(it.createdAt)
+                                            .atZone(ZoneId.systemDefault())
+                                            .hour
+                                    }
+                                    ?: emptyMap()
+                            }
+                        }
 
                     WeeklyCalendarGrid(
                         weekStart = weekStart,
-                        postsPerDay = samplePosts,
-                        onPostClick = { date, hour, title -> }
+                        postsPerDay = postsPerWeek,
+                        onPostClick = { date, hour, title -> },
+                        onPostLongPress = { date, hour, hourPosts ->
+
+                            selectedDay = date
+
+                            // ✅ only selected hour posts count
+                            selectedPosts = hourPosts.size
+
+
+
+                            // ✅ fetch actual Post objects for that hour
+                            selectedDayPosts = postData
+                                ?.filter {
+                                    val postDateTime = Instant.parse(it.createdAt)
+                                        .atZone(ZoneId.systemDefault())
+
+                                    postDateTime.toLocalDate() == date &&
+                                            postDateTime.hour == hour
+                                } ?: emptyList()
+
+                            showBottomSheet = true
+
+                            Log.d("week get  posts","--${selectedPosts}....${selectedDayPosts}")
+                        }
                     )
 
                 }
 
                 CalendarViewMode.DAY -> {
+                    // Prepare posts per hour for the selected day
+                    val postsPerHour: Map<Int, List<Post>> = remember(selectedDay, postData) {
+                        postData
+                            ?.filter { post ->
+                                val postDateTime = Instant.parse(post.createdAt)
+                                    .atZone(ZoneId.systemDefault())
+                                    .toLocalDate()
+                                postDateTime == selectedDay
+                            }
+                            ?.groupBy { post ->
+                                Instant.parse(post.createdAt)
+                                    .atZone(ZoneId.systemDefault())
+                                    .hour
+                            } ?: emptyMap()
+                    }
+
                     selectedDay?.let { day ->
                         DailyCalendarGrid(
                             selectedDay = day,
-                            postsPerHour = sampleDailyPosts,
-                            onPostClick = { date, hour, title ->
-                                println("Clicked $title on $date at $hour")
+                            postsPerHour = postsPerHour,
+                            onPostClick = { date, hour, posts ->
+                                // Handle click with the list of posts
+                                println("Clicked ${posts.size} posts on $date at $hour")
+                                // Example: open bottom sheet
+                                selectedDayPosts = posts
+                                selectedPosts = posts.size
+                                showBottomSheet = true
+                            },
+                            onPostLongPress = { date, hour, posts ->
+                                // Handle long press similarly
+                                println("Long pressed ${posts.size} posts on $date at $hour")
+                                selectedDayPosts = posts
+                                selectedPosts = posts.size
+                                showBottomSheet = true
                             }
                         )
                     }
                 }
 
-                CalendarViewMode.LIST -> {
-                    CalendarListView()
-                }
             }
 
         }
@@ -277,14 +333,6 @@ fun CalendarScreen(
 
 
 
-@Composable
-fun CalendarListView() {
-    Text(
-        text = "List View",
-        modifier = Modifier.padding(16.dp),
-        fontWeight = FontWeight.Bold
-    )
-}
 
 
 @Composable
@@ -299,7 +347,7 @@ fun CalendarViewModeSheet(
         SheetItem("Monthly") { onSelect(CalendarViewMode.MONTH) }
         SheetItem("Weekly") { onSelect(CalendarViewMode.WEEK) }
         SheetItem("Daily") { onSelect(CalendarViewMode.DAY) }
-        SheetItem("List") { onSelect(CalendarViewMode.LIST) }
+
     }
 }
 
@@ -362,35 +410,9 @@ fun CalendarTopBar() {
         }
     }
 }
-@Composable
-fun MemberRow() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        MemberAvatar("Mounika")
-        Spacer(modifier = Modifier.width(12.dp))
-        MemberAvatar("Nirvan")
-    }
-}
 
-@Composable
-fun MemberAvatar(name: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(Color(0xFFEAEAEA)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = name.first().toString(), fontWeight = FontWeight.Bold)
-        }
-        Text(text = name, fontSize = 12.sp)
-    }
-}
+
+
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -447,7 +469,7 @@ fun MonthSelector(
                     "${weekStart.format(formatter)} - ${weekEnd.format(formatter)}"
                 }
                 CalendarViewMode.DAY -> selectedDay?.format(DateTimeFormatter.ofPattern("d MMM, yyyy")) ?: ""
-                CalendarViewMode.LIST -> "Scheduled posts"
+
             }
 
             Text(
@@ -520,7 +542,7 @@ fun CalendarGrid(currentMonth: YearMonth,
                 )
                 postCountByDate[date] ?: 0
             } else 0
-
+            Log.d("dayNumber","--${dayNumber}....${posts}")
             CalendarDay(
                 day = if (dayNumber in 1..daysInMonth) dayNumber else null,
                 posts = posts,
@@ -538,7 +560,7 @@ fun CalendarGrid(currentMonth: YearMonth,
 fun CalendarDay(day: Int?, posts: Int,onLongPress: () -> Unit) {
     Box(
         modifier = Modifier
-            .height(100.dp) // <-- fixed height for each cell
+            .height(70.dp) // <-- fixed height for each cell
             .padding(1.dp)
             .clip(RoundedCornerShape(5.dp))
             .border(
@@ -570,7 +592,7 @@ fun CalendarDay(day: Int?, posts: Int,onLongPress: () -> Unit) {
                     Text(
                         text = "$posts posts",
                         color = Color(0xFF00C2A8),
-                        fontSize = 12.sp,
+                        fontSize = 10.sp,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
@@ -580,5 +602,35 @@ fun CalendarDay(day: Int?, posts: Int,onLongPress: () -> Unit) {
 }
 
 
+fun hourGradient(hour: Int): Brush {
+    return when (hour) {
 
-enum class CalendarViewMode { MONTH, WEEK, DAY, LIST }
+        // Early morning – very soft
+        in 5..7 -> Brush.horizontalGradient(
+            listOf(SoftLavender.copy(alpha = 0.3f), LightSkyBlue.copy(alpha = 0.3f))
+        )
+
+        // Morning – balanced
+        in 8..11 -> Brush.horizontalGradient(
+            listOf(SoftLavender.copy(alpha = 0.5f), LightSkyBlue.copy(alpha = 0.5f))
+        )
+
+        // Afternoon – strongest (peak hours)
+        in 12..17 -> Brush.horizontalGradient(
+            listOf(SoftLavender.copy(alpha = 0.55f), LightSkyBlue.copy(alpha = 0.55f))
+        )
+
+        // Evening – slightly reduced
+        in 18..23 -> Brush.horizontalGradient(
+            listOf(SoftLavender.copy(alpha = 0.75f), LightSkyBlue.copy(alpha = 0.75f))
+
+        )
+
+        // Night – no highlight
+        else -> Brush.horizontalGradient(
+            listOf(Color.Transparent, Color.Transparent)
+        )
+    }
+}
+
+enum class CalendarViewMode { MONTH, WEEK, DAY }

@@ -42,8 +42,8 @@ fun AutoPostingScreen(rootNavController: NavHostController, prefs: Prefs,viewMod
         mutableStateOf(
             prefs.getFacebookPages().map { page ->
                 SelectableAccount(
-                    id = page.id,
-                    name = page.name,
+                    id = page.id.toString(),
+                    name = page.name.toString(),
                     imageUrl = page.imageUrl,
                     platform = page.platform ?: "facebook",
                     isSelected = false
@@ -55,8 +55,8 @@ fun AutoPostingScreen(rootNavController: NavHostController, prefs: Prefs,viewMod
         mutableStateOf(
             prefs.getTwitterAccount()?.let {
                 SelectableAccount(
-                    id = it.id,
-                    name = it.name,
+                    id = it.id.toString(),
+                    name = it.name.toString(),
                     imageUrl = it.imageUrl,
                     platform = "twitter"
                 )
@@ -68,8 +68,8 @@ fun AutoPostingScreen(rootNavController: NavHostController, prefs: Prefs,viewMod
         mutableStateOf(
             prefs.getLinkedInAccount()?.let {
                 SelectableAccount(
-                    id = it.id,
-                    name = it.name,
+                    id = it.id.toString(),
+                    name = it.name.toString(),
                     imageUrl = it.imageUrl,
                     platform = "linkedin"
                 )

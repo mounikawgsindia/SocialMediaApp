@@ -1,8 +1,11 @@
 package com.wingspan.aimediahub.viewmodel
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -12,6 +15,7 @@ import com.wingspan.aimediahub.models.InstagramMediaResponse
 import com.wingspan.aimediahub.models.InstagramUserResponse
 import com.wingspan.aimediahub.models.LongLivedTokenResponse
 import com.wingspan.aimediahub.models.Post
+import com.wingspan.aimediahub.models.PostBodyRequest
 import com.wingspan.aimediahub.models.SocialAccount1
 import com.wingspan.aimediahub.models.TweetResponse
 import com.wingspan.aimediahub.repository.FacebookRepository
@@ -30,6 +34,7 @@ import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.time.LocalDate
 import javax.inject.Inject
 import kotlin.collections.emptyList
 
@@ -87,6 +92,10 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
     private val _linkedInError = MutableStateFlow<String?>(null)
     val linkedInError: StateFlow<String?> = _linkedInError
 
+
+    private val _linkedInpostStatus = MutableStateFlow<Boolean?>(null)
+    val linkedInpostStatus: StateFlow<Boolean?> = _linkedInpostStatus
+
     private val _mediaInstaLiveData = MutableLiveData<InstagramMediaResponse>()
     val mediaInstaLiveData: LiveData<InstagramMediaResponse> = _mediaInstaLiveData
 
@@ -99,11 +108,11 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
         _linkedInProfile.value=prefs.getLinkedInAccount()
 
         _instaProfile.value = prefs.getInstaAccount()
-        Log.d("instagram", "${prefs.getInstaAccount()}")
+        Log.d("twitter viewmodel", "${prefs.getTwitterAccount()}")
     }
 
 
-
+    //facebook api
 
     fun getFbPages() {
         viewModelScope.launch {
@@ -148,7 +157,7 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
         }
     }
 
-    //twitter api
+
 
 
     fun setFbDisconnected() {
@@ -172,36 +181,73 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
             }
         }
     }
+    @RequiresApi(Build.VERSION_CODES.O)
     fun publishFacebookPost(
-        pageId: String,
+        pageIds: List<String>,        // multiple pages support
         message: String,
-        sheduleTime: String,
+        times: List<String>,          // multiple schedule times
+        startDate: String,            // required
+        endDate: String,              // required
         imageUri: Uri?
     ) {
         viewModelScope.launch {
 
-            // ✅ reset before API so old success doesn't re-trigger
-            _fbpostStatus.value = null
+            val TAG = "PublishFBPost"
 
-            // ✅ Convert Uri → File (only here)
+            // reset before API so old success doesn't re-trigger
+            _fbpostStatus.value = null
+            Log.d(TAG, "API call started")
+
+            // Convert Uri → File (only here)
             val imageFile: File? = imageUri?.let {
                 uriToFile(context, it)
             }
 
+            Log.d(
+                TAG,
+                "Request data → pageIds=$pageIds, message=$message, times=$times, " +
+                        "startDate=$startDate, endDate=$endDate, " +
+                        "imageFile=${imageFile?.absolutePath ?: "NO_IMAGE"}"
+            )
+
+            // Safety defaults (backend requires these)
+            val safeStartDate = startDate.ifBlank {
+                LocalDate.now().toString()
+            }
+
+            val safeEndDate = endDate.ifBlank {
+                LocalDate.now().plusDays(1).toString()
+            }
+
+            Log.d(TAG, "Final dates → startDate=$safeStartDate, endDate=$safeEndDate")
+
             repository.publishFacebookPost(
-                pageId = pageId,
+                pageIds = pageIds,
                 message = message,
-                scheduleTime = sheduleTime,
+                times = times,
+                startDate = safeStartDate,
+                endDate = safeEndDate,
                 mediaFile = imageFile
             ).collect { resource ->
                 when (resource) {
-                    is Resource.Loading -> {}
+
+                    is Resource.Loading -> {
+                        Log.d(TAG, "Loading...")
+                    }
 
                     is Resource.Success -> {
-                        _fbpostStatus.value = resource.data?.success
+                        Log.d(
+                            TAG,
+                            "Success → response=${resource.data}"
+                        )
+                        _fbpostStatus.value = resource.data?.success == true
                     }
 
                     is Resource.Error -> {
+                        Log.e(
+                            TAG,
+                            "Error → ${resource.message}"
+                        )
                         _fbpostStatus.value = false
                     }
                 }
@@ -209,9 +255,13 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
         }
     }
 
+
+
+
     //get posts
     fun getPostedApi(){
         viewModelScope.launch {
+            Log.d("facebook get  posts","--${prefs.getUserID()}")
             repository.getPostedApi().collect {result ->
 
 
@@ -222,7 +272,7 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
                     is Resource.Success -> {
                         var responce=result.data?.posts
                         _fbgetPostStatus.value=responce ?: emptyList()
-                        Log.d("facebook get posts profile",
+                        Log.d("facebook get  posts",
                             (responce ?: "Unknown error").toString()
                         )
                     }
@@ -236,7 +286,11 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
     }
 
     //twitter
+    @SuppressLint("SuspiciousIndentation")
     fun twitterProfile() {
+        Log.d("twitter profile",
+          "twitterProfile"
+        )
         viewModelScope.launch {
             repository.twitterProfile().collect { resource ->
                 when (resource) {
@@ -245,16 +299,25 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
                     }
                     is Resource.Success -> {
 
-                        resource.data?.profile?.apiData.let{
+                        resource.data?.profile?.let{
                           val socialAccounts= SocialAccount1(
                               id = it?.id.toString(),
                               name =it?.name.toString(),
                               accessToken = it?.username.toString(),
-                              imageUrl =it?.profile_image_url ,
+                              imageUrl =it?.profileImageUrl ,
                               platform ="twitter"
                           )
+                            Log.d("twitter profile",
+                                resource.data?.profile?.profileImageUrl ?: ""
+                            )
+                            Log.d("twitter profile",
+                                prefs.getUserID().toString()
+                            )
                             _twitterProfile.value=socialAccounts
                             prefs.saveTwitterAccounts(socialAccounts)
+                            Log.d("twitter profile", "${socialAccounts}")
+                        }?:run{
+                            _twitterError.value="Issue with twitter Login and Profile data"
                         }
                     }
                     is Resource.Error -> {
@@ -267,42 +330,9 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
         }
     }
 
-    // linked in profile
-    fun linkedinProfile() {
-        viewModelScope.launch {
-            repository.linkedInProfile().collect { resource ->
-                when (resource) {
-                    is Resource.Loading -> {
-
-                    }
-                    is Resource.Success -> {
-
-                        resource.data?.profile?.let{
-                            val socialAccounts= SocialAccount1(
-                                id = it.providerId.toString(),
-                                name =it.name.toString(),
-                                accessToken = it.accessToken.toString(),
-                                imageUrl =it.profileImage ,
-                                platform ="linkedin"
-                            )
-                            _linkedInProfile.value=socialAccounts
-                            prefs.saveLinkedInAccounts(socialAccounts)
-                        }
-                    }
-                    is Resource.Error -> {
-                        // Error already comes from repository
-                        _linkedInError.value = resource.message ?: "Unknown error"
-                        Log.e("linked in profile", resource.message ?: "Unknown error")
-                    }
-                }
-            }
-        }
-    }
-
-
     fun setTwitterDisconnected() {
         viewModelScope.launch {
-            repository.fbDisconnect(DisconnectRequest(prefs.getUserID().toString())).collect { resource ->
+            repository.twitterDisconnect(DisconnectRequest(prefs.getUserID().toString())).collect { resource ->
                 when (resource) {
                     is Resource.Loading -> {
                         //  _fbLoading.value = true
@@ -323,6 +353,68 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
 
     }
 
+    // linked in profile
+    fun linkedinProfile() {
+        viewModelScope.launch {
+            repository.linkedInProfile().collect { resource ->
+                when (resource) {
+                    is Resource.Loading -> {
+
+                    }
+                    is Resource.Success -> {
+
+                        resource.data?.profile?.let{
+                            val socialAccounts= SocialAccount1(
+                                id = it.linkedinId.toString(),
+                                name =it.name.toString(),
+                                accessToken = it.accessToken.toString(),
+                                imageUrl =it.profileImage ,
+                                platform ="linkedin"
+                            )
+                            _linkedInProfile.value=socialAccounts
+                            prefs.saveLinkedInAccounts(socialAccounts)
+                        }
+                        Log.d("linked in profile", resource.data?.profile!!.profileImage.toString())
+                    }
+                    is Resource.Error -> {
+                        // Error already comes from repository
+                        _linkedInError.value = resource.message ?: "Unknown error"
+                        Log.e("linked in profile", resource.message ?: "Unknown error")
+                    }
+                }
+            }
+        }
+    }
+
+//    fun publishLinkedInPost(
+//        pageId: String,
+//        message: String,
+//        sheduleTime: String,
+//        imageUri: Uri?
+//    ) {
+//        viewModelScope.launch {
+//
+//            // ✅ reset before API so old success doesn't re-trigger
+//            _linkedInpostStatus.value = null
+//
+//            var request=PostBodyRequest(prefs.getUserID().toString(),message)
+//
+//            repository.publishFacebookPost(request).collect { resource ->
+//                when (resource) {
+//                    is Resource.Loading -> {}
+//
+//                    is Resource.Success -> {
+//                        _linkedInpostStatus.value = resource.data?.success
+//                    }
+//
+//                    is Resource.Error -> {
+//                        _linkedInpostStatus.value = false
+//                    }
+//                }
+//            }
+//        }
+//    }
+
     fun setLinkedDisconnected() {
         viewModelScope.launch {
             repository.linkedDisconnect(DisconnectRequest(prefs.getUserID().toString())).collect { resource ->
@@ -332,7 +424,7 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
                     }
                     is Resource.Success -> {
                         _linkedDisStatus.value = resource.data?.msg
-                        prefs.clearTwitterAccounts()
+                        prefs.clearLinkedInAccounts()
                         _linkedInProfile.value = null
                     }
                     is Resource.Error -> {
@@ -368,5 +460,6 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
 
         return tempFile
     }
+
 
 }

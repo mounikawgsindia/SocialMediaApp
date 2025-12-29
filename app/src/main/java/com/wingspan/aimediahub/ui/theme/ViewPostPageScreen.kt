@@ -57,7 +57,13 @@ fun ViewPostPageScreen(
     prefs: Prefs,
     rootNavController: NavHostController
 ) {
-
+    if (posts.isEmpty()) {
+        // Use LaunchedEffect to perform side-effect in Compose
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            rootNavController.navigateUp()
+        }
+        return // Don't render the rest of the UI
+    }
     val pages = remember { prefs.getFacebookPages() }
     val pageMap = remember { pages.associateBy { it.id } }
     val isNavigatingBack = remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -104,12 +110,11 @@ fun ViewPostPageScreen(
 
             // 📅 Date Header
             Text(
-                text = selectedDate.format(
-                    DateTimeFormatter.ofPattern("EEEE, dd MMM yyyy")
-                ),
+                text = "${selectedDate.format(DateTimeFormatter.ofPattern("EEEE, dd MMM yyyy"))} (${posts.size})",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
             )
+
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -153,17 +158,11 @@ fun ViewPostPageScreen(
 @Composable
 fun PostItem(post: Post) {
 
-    val zonedDateTime = remember(post.createdAt) {
+    val dateTimeText = remember(post.createdAt) {
         Instant.parse(post.createdAt)
             .atZone(ZoneId.systemDefault())
+            .format(DateTimeFormatter.ofPattern("dd MMM yyyy • hh:mm a"))
     }
-
-    val dateTimeText = remember(post.createdAt) {
-        zonedDateTime.format(
-            DateTimeFormatter.ofPattern("dd MMM yyyy • hh:mm a")
-        )
-    }
-
 
     Row(
         modifier = Modifier
@@ -171,46 +170,63 @@ fun PostItem(post: Post) {
             .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
             .border(1.dp, Color(0xFFE5E5E5), RoundedCornerShape(12.dp))
-            .padding(12.dp)
+            .padding(12.dp),
+        verticalAlignment = Alignment.Top
     ) {
 
-        Column {
-
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = dateTimeText,
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
-
-                StatusChip(post.status)
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = post.message,
-                fontSize = 15.sp,
-                maxLines = 3
+        // 🔹 Left Image
+        if (!post.mediaUrl.isNullOrEmpty()) {
+            AsyncImage(
+                model = post.mediaUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
             )
 
-            if (!post.mediaUrl.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                AsyncImage(
-                    model = post.mediaUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
+            Spacer(modifier = Modifier.width(12.dp))
+        }
+
+        // 🔹 Right Content
+        Column(
+            modifier = Modifier
+                .weight(1f)
+        ) {
+
+            // Title + Status row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+
+                Column(modifier = Modifier.weight(1f)) {
+                    // Title
+                    Text(
+                        text = post.message,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 4
+                    )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    // Date & Time below title
+                    Text(
+                        text = dateTimeText,
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+
+                // Top-right Status
+                StatusChip(post.status)
             }
         }
     }
 }
+
 
 // ---------------- CARD ----------------
 @Composable
@@ -251,112 +267,6 @@ fun PageHeader(page: SocialAccount1?) {
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
-@Composable
-fun PostCard(
-    post: Post,
-    page: SocialAccount1?
-) {
-
-    val brandColor = when (page?.platform?.lowercase()) {
-        "facebook" -> Color(0xFF1877F2)
-        "instagram" -> Color(0xFFE1306C)
-        "twitter" -> Color(0xFF1DA1F2)
-        else -> Color.Gray
-    }
-
-    val time = remember(post.createdAt) {
-        Instant.parse(post.createdAt)
-            .atZone(ZoneId.systemDefault())
-            .toLocalTime()
-            .format(DateTimeFormatter.ofPattern("hh:mm a"))
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
-            .border(1.dp, Color(0xFFE5E5E5), RoundedCornerShape(12.dp))
-    ) {
-
-        // Brand indicator
-        Box(
-            modifier = Modifier
-                .width(4.dp)
-                .fillMaxHeight()
-                .background(brandColor)
-        )
-
-        Column(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth()
-        ) {
-
-            // 🔝 Header
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-
-                    AsyncImage(
-                        model = page?.imageUrl,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(RoundedCornerShape(50)),
-                        contentScale = ContentScale.Crop
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = page?.name ?: "Unknown Page",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = brandColor
-                    )
-                }
-
-                StatusChip(post.status)
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = time,
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = post.message,
-                fontSize = 15.sp,
-                maxLines = 3
-            )
-
-            // Small thumbnail only
-            if (!post.mediaUrl.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                AsyncImage(
-                    model = post.mediaUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-        }
-    }
-}
-
 // ---------------- STATUS CHIP ----------------
 
 @Composable
@@ -380,20 +290,10 @@ fun StatusChip(status: String) {
     ) {
         Text(
             text = status.uppercase(),
-            fontSize = 12.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Medium,
             color = textColor
         )
     }
 }
 
-// ---------------- PAGE STYLE ----------------
-
-fun pageStyle(pageId: String): Pair<Color, String> {
-    return when (pageId) {
-        "943802612142922" -> Color(0xFF1877F2) to "Facebook"
-        "INSTAGRAM_ID" -> Color(0xFFE1306C) to "Instagram"
-        "TWITTER_ID" -> Color(0xFF1DA1F2) to "Twitter"
-        else -> Color.Gray to "Other"
-    }
-}

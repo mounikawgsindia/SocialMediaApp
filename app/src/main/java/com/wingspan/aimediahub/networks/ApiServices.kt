@@ -53,15 +53,31 @@ interface ApiServices {
     suspend fun fbDisconnect(@Body request:DisconnectRequest): Response<ResponseData>
 
 
+//
+//    @Multipart
+//    @POST("social/publish/facebook")
+//    suspend fun publishFacebookPost(
+//        @Part("pageId") pageId: RequestBody,
+//        @Part("userId") userId: RequestBody?,
+//        @Part("message") message: RequestBody,
+//        @Part("scheduleTime") scheduleTime: RequestBody?, // optional
+//        @Part media: MultipartBody.Part?                   // image/file
+//    ): Response<PublishPostResponse>
+
+
+
 
     @Multipart
-    @POST("social/publish/facebook")
+    @POST("automation/publish")
     suspend fun publishFacebookPost(
-        @Part("pageId") pageId: RequestBody,
-        @Part("userId") userId: RequestBody?,
+        @Part("platform") platform: RequestBody,
+        @Part("userId") userId: RequestBody,
         @Part("message") message: RequestBody,
-        @Part("scheduleTime") scheduleTime: RequestBody?, // optional
-        @Part media: MultipartBody.Part?                   // image/file
+        @Part("pageIds") pageIds: RequestBody,   // JSON array as String
+        @Part("times") times: RequestBody,       // JSON array as String
+        @Part("startDate") startDate: RequestBody,
+        @Part("endDate") endDate: RequestBody,
+        @Part media: MultipartBody.Part?          // image/file
     ): Response<PublishPostResponse>
 
 
@@ -93,4 +109,7 @@ interface ApiServices {
 
     @POST("social/linked/disconnect")
     suspend fun linkedInDisconnect(@Body request:DisconnectRequest): Response<ResponseData>
+
+    @POST("api/linkedin/post")
+    suspend fun linkedInPost(@Body request:PostBodyRequest): Response<TwitterPostResponse>
 }

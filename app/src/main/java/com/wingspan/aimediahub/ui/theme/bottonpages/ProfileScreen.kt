@@ -62,7 +62,7 @@ fun ProfileScreen(
         ) {
             Row(
                 modifier = Modifier
-                    .padding(16.dp)
+                    .padding(top=50.dp, start = 16.dp, end = 16.dp)
                     .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {

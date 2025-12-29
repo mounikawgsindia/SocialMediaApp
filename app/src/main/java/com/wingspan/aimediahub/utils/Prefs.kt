@@ -139,6 +139,12 @@ class Prefs @Inject constructor(@ApplicationContext private val  context: Contex
             apply()
         }
     }
+    fun clearLinkedInAccounts() {
+        prefs.edit().apply {
+            remove("LinkedIn_Account")
+            apply()
+        }
+    }
     fun clearInstaAccounts() {
         prefs.edit().apply {
             remove("Insta_Account")

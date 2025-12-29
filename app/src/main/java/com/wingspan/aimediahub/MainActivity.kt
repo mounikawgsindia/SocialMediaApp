@@ -27,6 +27,7 @@ import com.wingspan.aimediahub.ui.theme.CreatePostScreen
 import com.wingspan.aimediahub.ui.theme.auth.LoginScreen
 import com.wingspan.aimediahub.ui.theme.auth.RegistrationScreen
 import com.wingspan.aimediahub.ui.theme.AIChatPage
+import com.wingspan.aimediahub.ui.theme.AnalyticsPostPage
 import com.wingspan.aimediahub.ui.theme.ViewPostPageScreen
 import com.wingspan.aimediahub.utils.Prefs
 import dagger.hilt.android.AndroidEntryPoint
@@ -179,6 +180,10 @@ fun MainApp(prefs: Prefs ,fbDeepLink: Boolean,
 
         composable("autoposting_screen") {
             AutoPostingScreen(rootNavController,prefs)
+        }
+
+        composable("analytics_post_page") {
+            AnalyticsPostPage(rootNavController, prefs)
         }
 
         composable("aichatpage/{topic}") { backStackEntry ->

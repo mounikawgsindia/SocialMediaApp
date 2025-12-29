@@ -1,10 +1,13 @@
 package com.wingspan.aimediahub.ui.theme
 
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -24,60 +29,62 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.wingspan.aimediahub.models.Post
+import com.wingspan.aimediahub.ui.theme.bottonpages.hourGradient
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Composable
 fun CalenderViewData() {
 }
-
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun WeeklyCalendarGrid(
     weekStart: LocalDate,
-    postsPerDay: Map<LocalDate, List<Pair<Int, String>>> = emptyMap(),
-    onPostClick: (LocalDate, Int, String) -> Unit = { _, _, _ -> }
+    postsPerDay: Map<LocalDate, Map<Int, List<Post>>>,
+    onPostClick: (LocalDate, Int, String) -> Unit = { _, _, _ -> },
+    onPostLongPress: (LocalDate, Int, List<Post>) -> Unit
 ) {
     val daysOfWeek = remember(weekStart) {
         (0..6).map { weekStart.plusDays(it.toLong()) }
     }
 
-    // 🔑 KEYED scroll states (IMPORTANT)
-    val verticalScrollState = remember(weekStart) { ScrollState(0) }
-    val horizontalScrollState = remember { ScrollState(0) }
+    val verticalScrollState = rememberScrollState()
+    val horizontalScrollState = rememberScrollState()
 
     Row(modifier = Modifier.fillMaxSize()) {
 
-        /* HOURS COLUMN */
+        /* ================= LEFT HOURS COLUMN ================= */
         Column(
-            modifier = Modifier
-                .width(50.dp)
-                .verticalScroll(verticalScrollState)
+            modifier = Modifier.width(70.dp)
         ) {
             Spacer(modifier = Modifier.height(40.dp))
 
-            for (hour in 0..23) {
-                Box(
-                    modifier = Modifier
-                        .height(40.dp)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Text(
-                        text = "$hour:00",
-                        fontSize = 12.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+            Column(modifier = Modifier.verticalScroll(verticalScrollState)) {
+                for (hour in 0..23) {
+                    Box(
+                        modifier = Modifier
+                            .height(40.dp)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Text(
+                            text = formatHour(hour), // ✅ AM / PM
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(end = 6.dp)
+                        )
+                    }
                 }
             }
         }
 
-        /* DAYS GRID */
+        /* ================= DAYS GRID ================= */
         Row(
             modifier = Modifier.horizontalScroll(horizontalScrollState)
         ) {
@@ -85,12 +92,11 @@ fun WeeklyCalendarGrid(
 
                 Column(
                     modifier = Modifier
-                        .width(80.dp)
-                        .verticalScroll(verticalScrollState)
+                        .width(60.dp)
                         .border(0.5.dp, Color.LightGray)
                 ) {
 
-                    // HEADER
+                    /* 🔹 HEADER */
                     Box(
                         modifier = Modifier
                             .height(40.dp)
@@ -104,38 +110,59 @@ fun WeeklyCalendarGrid(
                         )
                     }
 
-                    // HOURS
-                    for (hour in 0..23) {
-                        Box(
-                            modifier = Modifier
-                                .height(40.dp)
-                                .fillMaxWidth()
-                                .border(0.5.dp, Color.LightGray)
-                        ) {
-                            postsPerDay[date]
-                                ?.firstOrNull { it.first == hour }
-                                ?.let { post ->
+                    /* 🔹 SCROLLABLE HOURS */
+                    Column(
+                        modifier = Modifier.verticalScroll(verticalScrollState)
+                    ) {
+                        for (hour in 0..23) {
+                            val hourPosts =
+                                postsPerDay[date]?.get(hour).orEmpty()
 
+                            Box(
+                                modifier = Modifier
+                                    .height(40.dp)
+                                    .fillMaxWidth()
+                                    .border(0.5.dp, Color.LightGray)
+                            ) {
+                                if (hourPosts.isNotEmpty()) {
                                     Card(
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = Color(0xFF00C2A8)
-                                        ),
+                                        colors = CardDefaults.cardColors(),
                                         shape = RoundedCornerShape(6.dp),
                                         modifier = Modifier
                                             .padding(4.dp)
                                             .fillMaxWidth()
-                                            .clickable {
-                                                onPostClick(date, hour, post.second)
-                                            }
+                                            .combinedClickable(
+                                                onClick = {
+                                                    onPostClick(
+                                                        date,
+                                                        hour,
+                                                        hourPosts.first().message
+                                                    )
+                                                },
+                                                onLongClick = {
+                                                    onPostLongPress(
+                                                        date,
+                                                        hour,
+                                                        hourPosts
+                                                    )
+                                                }
+                                            )
                                     ) {
-                                        Text(
-                                            text = post.second,
-                                            fontSize = 10.sp,
-                                            color = Color.White,
-                                            modifier = Modifier.padding(4.dp)
-                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(postCardGradient) // ✅ GRADIENT HERE
+                                        ) {
+                                            Text(
+                                                text = "${hourPosts.size} posts",
+                                                fontSize = 10.sp,
+                                                color = Color.Black, // better contrast
+                                                modifier = Modifier.padding(3.dp)
+                                            )
+                                        }
                                     }
                                 }
+                            }
                         }
                     }
                 }
@@ -143,56 +170,55 @@ fun WeeklyCalendarGrid(
         }
     }
 }
-
-
-
+val postCardGradient = Brush.horizontalGradient(
+    listOf(LightSkyBlue, SoftLavender)
+)
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun DailyCalendarGrid(
     selectedDay: LocalDate,
-    postsPerHour: Map<Int, String> = emptyMap(),
-    onPostClick: (LocalDate, Int, String) -> Unit = { _, _, _ -> }
+    postsPerHour: Map<Int, List<Post>> = emptyMap(),
+    onPostClick: (LocalDate, Int, List<Post>) -> Unit = { _, _, _ -> },
+    onPostLongPress: (LocalDate, Int, List<Post>) -> Unit = { _, _, _ -> }
 ) {
-    // 🔑 Reset scroll when day changes
-    val verticalScrollState = remember(selectedDay) { ScrollState(0) }
+    val verticalScrollState = rememberScrollState()
 
     Row(modifier = Modifier.fillMaxSize()) {
 
-        /* HOURS COLUMN */
+        /* ================= LEFT TIME COLUMN ================= */
         Column(
-            modifier = Modifier
-                .width(50.dp)
-                .verticalScroll(verticalScrollState)
+            modifier = Modifier.width(70.dp)
         ) {
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(40.dp)) // header space
 
-            for (hour in 0..23) {
-                Box(
-                    modifier = Modifier
-                        .height(40.dp)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Text(
-                        text = "$hour:00",
-                        fontSize = 12.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+            Column(modifier = Modifier.verticalScroll(verticalScrollState)) {
+                for (hour in 0..23) {
+                    Box(
+                        modifier = Modifier
+                            .height(40.dp)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Text(
+                            text = formatHour(hour),   // ✅ AM/PM format
+                            fontSize = 12.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(end = 6.dp)
+                        )
+                    }
                 }
             }
         }
 
-        /* DAY COLUMN */
+        /* ================= RIGHT DAY GRID ================= */
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(verticalScrollState)
                 .border(0.5.dp, Color.LightGray)
         ) {
 
-            // DAY HEADER
+            /* 🔹 FIXED HEADER */
             Box(
                 modifier = Modifier
                     .height(40.dp)
@@ -208,34 +234,44 @@ fun DailyCalendarGrid(
                 )
             }
 
-            // HOURS GRID
-            for (hour in 0..23) {
-                Box(
-                    modifier = Modifier
-                        .height(40.dp)
-                        .fillMaxWidth()
-                        .border(0.5.dp, Color.LightGray)
-                ) {
+            /* 🔹 SCROLLABLE HOURS GRID */
+            Column(
+                modifier = Modifier.verticalScroll(verticalScrollState)
+            ) {
+                for (hour in 0..23) {
+                    val hourPosts = postsPerHour[hour].orEmpty()
 
-                    postsPerHour[hour]?.let { title ->
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFF00C2A8)
-                            ),
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier
-                                .padding(4.dp)
-                                .fillMaxWidth()
-                                .clickable {
-                                    onPostClick(selectedDay, hour, title)
-                                }
-                        ) {
-                            Text(
-                                text = title,
-                                fontSize = 12.sp,
-                                color = Color.White,
-                                modifier = Modifier.padding(6.dp)
-                            )
+                    Box(
+                        modifier = Modifier
+                            .height(40.dp)
+                            .fillMaxWidth()
+                            .background(hourGradient(hour))
+                            .border(0.5.dp, Color.LightGray)
+                    ) {
+                        if (hourPosts.isNotEmpty()) {
+                            Card(
+
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .fillMaxWidth()
+                                    .combinedClickable(
+                                        onClick = {
+                                            onPostClick(selectedDay, hour, hourPosts)
+                                        },
+                                        onLongClick = {
+                                            onPostLongPress(selectedDay, hour, hourPosts)
+                                        }
+                                    )
+                            ) {
+                                Text(
+                                    text = "${hourPosts.size} posts",
+                                    fontSize = 12.sp,
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(6.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -243,3 +279,5 @@ fun DailyCalendarGrid(
         }
     }
 }
+
+

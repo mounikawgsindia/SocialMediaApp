@@ -72,7 +72,14 @@ import com.wingspan.aimediahub.viewmodel.FacebookViewModel
 import kotlin.io.encoding.ExperimentalEncodingApi
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.net.URLEncoder
+import okhttp3.Call
+import okhttp3.Callback
 
+import okhttp3.Response
+import java.io.IOException
 @OptIn(ExperimentalEncodingApi::class)
 @SuppressLint("ContextCastToActivity")
 @Composable
@@ -156,7 +163,17 @@ fun HomeScreen( bottomNavController: NavHostController,
                 // -------------------- TITLE --------------------
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxWidth().clickable{
+                            verifyTelegramChannel("@momlovesdaughter") { success, message ->
+                                if (success) {
+                                   Log.d("checking","${message}")
+                                    sendTelegramMessage()
+                                } else {
+                                    Log.e("checking","${message}")
+                                }
+                            }
+
+                        }
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -219,7 +236,7 @@ fun HomeScreen( bottomNavController: NavHostController,
                 // ---------------- upcomming POSTS ----------------
                 Spacer(Modifier.height(12.dp))
                 UpcomingPostsSection(onArrowClick = {
-                    bottomNavController.navigate("calendar") {
+                    rootNavController.navigate("calendar") {
                         // optional: avoid multiple copies in back stack
                         launchSingleTop = true
                         restoreState = true
@@ -250,14 +267,9 @@ fun HomeScreen( bottomNavController: NavHostController,
                         modifier = Modifier
                             .weight(1f)
                             .clickable {
-                                bottomNavController.navigate("calendar") {
-                                    // optional: avoid multiple copies in back stack
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
+                                rootNavController.navigate("create_post_screen")
 
-
-                            }   // Equal width
+                            }
 
                     )
                     ActionButton(
@@ -310,6 +322,70 @@ fun HomeScreen( bottomNavController: NavHostController,
 
 
 }
+fun sendTelegramMessage() {
+    //nirvan
+    val botToken = "8568025768:AAGd_p5-Bn94cOTco5hMikyCkuC3AO9Tot4" // after revoke
+    val chatId = "@momlovesdaughter"
+    val message = "my first message"
+
+    val encodedMessage = URLEncoder.encode(message, "UTF-8")
+
+    val url =
+        "https://api.telegram.org/bot$botToken/sendMessage" +
+                "?chat_id=$chatId&text=$encodedMessage"
+
+    val client = OkHttpClient()
+
+    val request = Request.Builder()
+        .url(url)
+        .build()
+
+    client.newCall(request).enqueue(object : okhttp3.Callback {
+
+        override fun onFailure(call: Call, e: IOException) {
+            Log.e("Telegram", "Message failed", e)
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            Log.d("Telegram", "Success: ${response.body?.string()}")
+        }
+    })
+}
+fun verifyTelegramChannel(
+    channelUsername: String,
+    onResult: (Boolean, String) -> Unit
+) {
+    val botToken = "8568025768:AAGd_p5-Bn94cOTco5hMikyCkuC3AO9Tot4" // local testing only
+    val testMessage = "."
+
+    val encodedMessage = URLEncoder.encode(testMessage, "UTF-8")
+
+    val url =
+        "https://api.telegram.org/bot$botToken/sendMessage" +
+                "?chat_id=$channelUsername&text=$encodedMessage"
+
+    val client = OkHttpClient()
+    val request = Request.Builder().url(url).build()
+
+    client.newCall(request).enqueue(object : Callback {
+
+        override fun onFailure(call: Call, e: IOException) {
+            onResult(false, "Network error")
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            when (response.code) {
+                200 -> onResult(true, "Bot is admin → Channel connected")
+                403 -> onResult(false, "Bot is NOT admin")
+                401 -> onResult(false, "Invalid bot token")
+                400 -> onResult(false, "Invalid channel")
+                else -> onResult(false, "Unknown error")
+            }
+        }
+    })
+}
+
+
 @Composable
 fun UpcomingPostsSection(onArrowClick:()->Unit) {
     Card(
@@ -573,7 +649,7 @@ fun ConnectedAccountsSection(
 
     var facebookAccounts = accounts.value.map { page ->
         SocialAccount(
-            id=page.id,
+            id= page.id.toString(),
             platform = "Facebook",
             connected = true,
             imageUrl = page.imageUrl,
@@ -583,7 +659,7 @@ fun ConnectedAccountsSection(
     val twitterAccount = twitterData.value?.let {
         Log.d("data","---${it.accessToken}....${it.imageUrl}")
         SocialAccount(
-            id=it.id,
+            id= it.id.toString(),
             platform = "Twitter",
             connected = true,
             imageUrl = it.imageUrl,
@@ -593,7 +669,7 @@ fun ConnectedAccountsSection(
     val instagramAccount = instagramData.value?.let {
         Log.d("data","---${it.accessToken}....${it.imageUrl}")
         SocialAccount(
-            id=it.id,
+            id= it.id.toString(),
             platform = "Instagram",
             connected = true,
             imageUrl = it.imageUrl,
@@ -604,7 +680,7 @@ fun ConnectedAccountsSection(
     val linkedInAccount = linkedInData.value?.let {
         Log.d("data","---${it.accessToken}....${it.imageUrl}")
         SocialAccount(
-            id=it.id,
+            id= it.id.toString(),
             platform = "LinkedIn",
             connected = true,
             imageUrl = it.imageUrl,
@@ -848,8 +924,7 @@ fun logoutInstagram(viewModel: FacebookViewModel){
 
 
 
-@Composable
-fun AnalyticsScreen() = ScreenBase("Analytics Screen")
+
 
 
 fun openFacebookPage(context: Context, pageId: String) {
@@ -910,13 +985,3 @@ fun openTwitterProfile(context: Context, userName: String) {
 }
 
 
-
-@Composable
-fun ScreenBase(title: String) {
-    Box(
-        Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = title, fontSize = 22.sp)
-    }
-}

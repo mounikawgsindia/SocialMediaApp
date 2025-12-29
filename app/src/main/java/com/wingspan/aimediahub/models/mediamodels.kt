@@ -166,33 +166,30 @@ data class LinkedInProfileResponse(
 )
 
 data class LinkedInProfile(
-    val providerId: String,
-    val accessToken: String,
-    val tokenExpiresAt: String,
-    val loginPlatform: String,
-    val name: String,
-    val firstName: String,
-    val lastName: String,
-    val email: String,
-    val profileImage: String,
-    val linkedinId: String,
-    val userId: String
+    val accessToken: String?,
+    val tokenExpiresAt: String?,
+    val loginPlatform: String?,
+    val name: String?,
+    val firstName: String?,
+    val lastName: String?,
+    val email: String?,
+    val profileImage: String?,
+    val linkedinId: String?,
+    val userId: String?
 )
+
 
 
 data class TwitterProfile(
-    val apiData: TwitterApiData
-)
-data class TwitterApiData(
     val username: String,
     val id: String,
     val name: String,
-    val profile_image_url: String
+    val profileImageUrl: String
 )
 data class PostBodyRequest(val userId:String,val content: String)
 data class PublishPostResponse(
     val success: Boolean,
-    val result: PublishResult?
+    val platform: String
 )
 
 data class PublishResult(
@@ -208,9 +205,9 @@ data class SelectableAccount(
 )
 
 data class SocialAccount1(
-    val id: String,           // Facebook Page ID
-    val name: String,         // Page name
-    val accessToken: String,  // Page access token
+    val id: String?,           // Facebook Page ID
+    val name: String?,         // Page name
+    val accessToken: String?,  // Page access token
     val imageUrl: String?,
     val platform:String?
     // Page profile image URL

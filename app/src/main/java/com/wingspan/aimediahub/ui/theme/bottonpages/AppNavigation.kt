@@ -12,6 +12,7 @@ import androidx.navigation.compose.rememberNavController
 import com.wingspan.aimediahub.utils.BottomNavItem
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.wingspan.aimediahub.ui.theme.AnalyticsScreen
 import com.wingspan.aimediahub.utils.Prefs
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -49,7 +50,10 @@ fun AppNavigation(
                     rootNavController = rootNavController,prefs)
             }
             composable(BottomNavItem.Analytics.route) {
-                AnalyticsScreen()
+                AnalyticsScreen(
+                    bottomNavController = childNavController,
+                    rootNavController = rootNavController, prefs
+                )
             }
             composable(BottomNavItem.Profile.route) {
                 ProfileScreen(bottomNavController = childNavController,
