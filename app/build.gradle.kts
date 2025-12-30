@@ -68,9 +68,9 @@ android {
 }
 
 dependencies {
-
+    implementation(libs.okhttp)
     //encrption of safe data
-    implementation ("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation ("androidx.security:security-crypto:1.1.0")
     implementation("androidx.browser:browser:1.8.0")
     //video
     implementation(libs.androidx.media3.exoplayer)

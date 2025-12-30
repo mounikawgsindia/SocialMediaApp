@@ -87,6 +87,22 @@ import com.wingspan.aimediahub.R
 import com.wingspan.aimediahub.models.SocialAccount1
 import com.wingspan.aimediahub.utils.Prefs
 import com.wingspan.aimediahub.viewmodel.FacebookViewModel
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.OkHttpClient
+
+
+import okhttp3.Response
+
+
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
+import java.io.IOException
+
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -204,20 +220,14 @@ fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: Fac
                 val message = postText
                 if(!message.isEmpty()){
                     if (currentfbPages.isNotEmpty()) {
-//                        currentfbPages.forEach { page ->
-//                            val sheduleTime =
-//                                if (selectedDate != null && selectedTime != null) {
-//                                    "${selectedDate!!.format(DateTimeFormatter.ISO_DATE)} " +
-//                                            selectedTime!!.format(DateTimeFormatter.ofPattern("HH:mm"))
-//                                } else {
-//                                    ""
-//                                }
-//
-//                            viewModel.publishFacebookPost(
-//                                pageId = page.id.toString(),
-//                                sheduleTime=sheduleTime,
-//                                message = message, imageUri = selectedImageUri)
-//                        }
+                        val uri = selectedImageUri
+                        if (uri != null) {
+                            val imageFile = convertUriToFile(context, uri)
+                            sendTelegramPhoto(imageFile)
+                        } else {
+                            Log.e("Telegram", "Selected image Uri is null")
+                        }
+
                         viewModel.publishFacebookPost(
                             pageIds = currentfbPages.map { it.id.toString() },
                             message = postText,
@@ -980,4 +990,55 @@ fun AddTimeChip(onAdd: () -> Unit) {
         Text("+ Add Time", color = Color(0xFF1976D2))
     }
 }
+fun convertUriToFile(context: Context, uri: Uri): File {
+    val inputStream = context.contentResolver.openInputStream(uri)
+        ?: throw IllegalArgumentException("Cannot open input stream from URI")
 
+    val file = File(
+        context.cacheDir,
+        "telegram_${System.currentTimeMillis()}.jpg"
+    )
+
+    file.outputStream().use { output ->
+        inputStream.use { input ->
+            input.copyTo(output)
+        }
+    }
+
+    return file
+}
+
+fun sendTelegramPhoto(imageFile: File) {
+
+
+    val botToken = "8568025768:AAGd_p5-Bn94cOTco5hMikyCkuC3AO9Tot4" // after revoke
+    val chatId = "@mounikaheshu"
+    val requestBody = MultipartBody.Builder()
+        .setType(MultipartBody.FORM)
+        .addFormDataPart("chat_id", chatId)
+        .addFormDataPart("caption", "Hello with image")
+        .addFormDataPart(
+            "photo",
+            imageFile.name,
+            imageFile.asRequestBody("image/*".toMediaType())
+        )
+        .build()
+
+    val request = Request.Builder()
+        .url("https://api.telegram.org/bot$botToken/sendPhoto")
+        .post(requestBody)
+        .build()
+    val client = OkHttpClient()
+
+    client.newCall(request).enqueue(object : Callback {
+
+        override fun onFailure(call: Call, e: IOException) {
+            Log.e("Telegram", "Failed", e)
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            Log.d("Telegram", response.body?.string() ?: "")
+        }
+    })
+
+}

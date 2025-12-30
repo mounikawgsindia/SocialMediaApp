@@ -7,7 +7,6 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
-import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -62,7 +61,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
-import com.facebook.login.LoginManager
 import com.wingspan.aimediahub.R
 import com.wingspan.aimediahub.utils.AppTextStyles.MainHeadingBlack
 import com.wingspan.aimediahub.MainActivity
@@ -72,6 +70,9 @@ import com.wingspan.aimediahub.viewmodel.FacebookViewModel
 import kotlin.io.encoding.ExperimentalEncodingApi
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import com.wingspan.aimediahub.ui.theme.nestedcompose.TelegramConnectDialog
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
@@ -79,13 +80,14 @@ import okhttp3.Call
 import okhttp3.Callback
 
 import okhttp3.Response
+import org.json.JSONObject
 import java.io.IOException
 @OptIn(ExperimentalEncodingApi::class)
 @SuppressLint("ContextCastToActivity")
 @Composable
 fun HomeScreen( bottomNavController: NavHostController,
                 rootNavController: NavHostController,pref:Prefs,fbDeepLink:String ,twitterDeepLink:String,linkedInDeepLink:String,viewModel: FacebookViewModel =hiltViewModel()) {
-
+    val scope = rememberCoroutineScope()
     var context= LocalContext.current
     val isLoading by viewModel.fbLoading.collectAsState()
     var showWebView by remember { mutableStateOf(false) }
@@ -93,6 +95,7 @@ fun HomeScreen( bottomNavController: NavHostController,
     Log.d("deep link check","--->${fbDeepLink}...${twitterDeepLink}....${linkedInDeepLink}")
 
     var disconnectDialog by remember { mutableStateOf(false) }
+    var telegramUIDialog by remember { mutableStateOf(false) }
     //facebook state
     val fbDisStatus by viewModel.fbDisStatus.collectAsState()
     val fbPages by viewModel.facebookaccounts.collectAsState()
@@ -163,17 +166,7 @@ fun HomeScreen( bottomNavController: NavHostController,
                 // -------------------- TITLE --------------------
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth().clickable{
-                            verifyTelegramChannel("@momlovesdaughter") { success, message ->
-                                if (success) {
-                                   Log.d("checking","${message}")
-                                    sendTelegramMessage()
-                                } else {
-                                    Log.e("checking","${message}")
-                                }
-                            }
-
-                        }
+                        .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -190,27 +183,31 @@ fun HomeScreen( bottomNavController: NavHostController,
 
                 // ---------------- CONNECTED & NON-CONNECTED ACCOUNTS ----------------
                 Spacer(Modifier.height(20.dp))
-                ConnectedAccountsSection(viewModel,context,pref, onFacebookConnect = {
+                ConnectedAccountsSection(
+                    onTelegramDialogChange = { telegramUIDialog = it },viewModel,context,pref,
+                    onFacebookConnect = {
 
-                    showWebView = true
+                        connectFacebook(context,pref)
+                    },
+                    onDisconnec = { platform->
+                        Log.d("dis","--->${platform}")
+                        flatformDisConnect=platform
+                        disconnectDialog=true
 
-                }, onDisconnec = { platform->
-                    Log.d("dis","--->${platform}")
-                    flatformDisConnect=platform
-                    disconnectDialog=true
+                    },
+                    OnConnectionclick={ platform, pageId ,username->
+                        //this navigate to facebook pages
+                        Log.d("OnConnectionClick", "Platform: $platform, PageId: $pageId")
+                        if(platform.equals("Twitter")){
+                            openTwitterProfile(context,username)
+                        }else if(platform.equals("Facebook")){
+                            openFacebookPage(context, pageId)
+                        }
 
-                },OnConnectionclick={ platform, pageId ,username->
-                    Log.d("OnConnectionClick", "Platform: $platform, PageId: $pageId")
-                    if(platform.equals("Twitter")){
-                        openTwitterProfile(context,username)
-                    }else if(platform.equals("Facebook")){
-                        openFacebookPage(context, pageId)
-                    }
+                }, onInstagramConnect = {
+                        connectInstagram(context,pref)
+                    })
 
-                })
-                if (showWebView) {
-                    connectFacebook(context,pref)
-                }
                 Spacer(Modifier.height(25.dp))
 
 
@@ -287,6 +284,45 @@ fun HomeScreen( bottomNavController: NavHostController,
 
         }
     }
+    if(telegramUIDialog){
+        TelegramConnectDialog(
+            onDismiss = { telegramUIDialog=false },
+            onConfirm = { groupOrChannel ->
+                Log.d("Telegram", groupOrChannel)
+                    //@momlovesdaughter
+                verifyTelegramChannel(groupOrChannel) { success, message ->
+
+                    if (success) {
+                        Log.d("checking","${message}")
+                        scope.launch {
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        }
+                        telegramUIDialog=false
+                        sendTelegramMessage(groupOrChannel)
+                        getTelegramChatInfo(groupOrChannel) { success, title, username, smallId, bigId, error ->
+
+                            if (success) {
+                                Log.d("Telegram", "Title: $title")
+                                Log.d("Telegram", "Username: $username")
+                                Log.d("Telegram", "Small photo ID: $smallId")
+                                Log.d("Telegram", "Big photo ID: $bigId")
+                            } else {
+                                Log.e("Telegram", "Error: $error")
+                            }
+                        }
+                    } else {
+                        scope.launch {
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        }
+                        Log.e("Telegram","${message}")
+                    }
+                }
+
+
+
+            }
+        )
+    }
     if(disconnectDialog){
 
         AlertDialog(
@@ -322,11 +358,15 @@ fun HomeScreen( bottomNavController: NavHostController,
 
 
 }
-fun sendTelegramMessage() {
+
+
+fun sendTelegramMessage(chatId: String) {
     //nirvan
-    val botToken = "8568025768:AAGd_p5-Bn94cOTco5hMikyCkuC3AO9Tot4" // after revoke
-    val chatId = "@momlovesdaughter"
-    val message = "my first message"
+
+//    val chatId = "@momlovesdaughter"
+    val botToken = "8375721385:AAFOc1Ozs2ddX00Bw3PZT5YGlpapk7Sdsrg" // after revoke
+    //val chatId = "@mounikaheshu"
+    val message = "hi every one"
 
     val encodedMessage = URLEncoder.encode(message, "UTF-8")
 
@@ -355,14 +395,12 @@ fun verifyTelegramChannel(
     channelUsername: String,
     onResult: (Boolean, String) -> Unit
 ) {
-    val botToken = "8568025768:AAGd_p5-Bn94cOTco5hMikyCkuC3AO9Tot4" // local testing only
-    val testMessage = "."
-
-    val encodedMessage = URLEncoder.encode(testMessage, "UTF-8")
+    val botToken = "8375721385:AAFOc1Ozs2ddX00Bw3PZT5YGlpapk7Sdsrg"
+    val botId = "8375721385"
 
     val url =
-        "https://api.telegram.org/bot$botToken/sendMessage" +
-                "?chat_id=$channelUsername&text=$encodedMessage"
+        "https://api.telegram.org/bot$botToken/getChatMember" +
+                "?chat_id=$channelUsername&user_id=$botId"
 
     val client = OkHttpClient()
     val request = Request.Builder().url(url).build()
@@ -374,12 +412,93 @@ fun verifyTelegramChannel(
         }
 
         override fun onResponse(call: Call, response: Response) {
-            when (response.code) {
-                200 -> onResult(true, "Bot is admin → Channel connected")
-                403 -> onResult(false, "Bot is NOT admin")
-                401 -> onResult(false, "Invalid bot token")
-                400 -> onResult(false, "Invalid channel")
-                else -> onResult(false, "Unknown error")
+            val body = response.body?.string() ?: ""
+
+            when {
+                response.code == 200 && body.contains("\"status\":\"administrator\"") ->
+                    onResult(true, "Bot is admin → Channel connected")
+
+                response.code == 200 && body.contains("\"status\":\"creator\"") ->
+                    onResult(true, "Bot is owner → Channel connected")
+
+                response.code == 200 ->
+                    onResult(false, "Bot is NOT admin")
+
+                response.code == 401 ->
+                    onResult(false, "Invalid bot token")
+
+                response.code == 400 ->
+                    onResult(false, "Invalid channel")
+
+                else ->
+                    onResult(false, "Unknown error")
+            }
+        }
+    })
+}
+
+fun getTelegramChatInfo(
+    chatUsername: String,   // example: "@nirvangroup"
+    onResult: (Boolean, String?, String?,String?,String?,error: String?
+    ) -> Unit
+) {
+    val botToken = "8375721385:AAFOc1Ozs2ddX00Bw3PZT5YGlpapk7Sdsrg"
+
+    val url =
+        "https://api.telegram.org/bot$botToken/getChat?chat_id=$chatUsername"
+
+    val client = OkHttpClient()
+    val request = Request.Builder().url(url).get().build()
+
+    client.newCall(request).enqueue(object : Callback {
+
+        override fun onFailure(call: Call, e: IOException) {
+            onResult(false, null, null, null, null, "Network error")
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            val body = response.body?.string() ?: ""
+
+            if (!response.isSuccessful) {
+                onResult(
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "Telegram error: ${response.code}"
+                )
+                return
+            }
+
+            try {
+                val json = JSONObject(body)
+                val result = json.getJSONObject("result")
+
+                val title = result.optString("title")        // Group / Channel name
+                val username = result.optString("username")  // Public username
+
+                // --- NEW: Photo parsing ---
+                var smallPhotoId: String? = null
+                var bigPhotoId: String? = null
+
+                if (result.has("photo")) {
+                    val photo = result.getJSONObject("photo")
+                    smallPhotoId = photo.optString("small_file_id")
+                    bigPhotoId = photo.optString("big_file_id")
+                }
+
+                // You can return photo IDs as needed
+                onResult(
+                    true,
+                    title,
+                    username,
+                    smallPhotoId,
+                    bigPhotoId.toString(),null
+                )
+
+            } catch (e: Exception) {
+                onResult(false, null, null, null, null,"Invalid response")
             }
         }
     })
@@ -630,8 +749,14 @@ fun ActionButton(title: String, icon: Int,
 @SuppressLint("ContextCastToActivity")
 @Composable
 fun ConnectedAccountsSection(
+    onTelegramDialogChange: (Boolean) -> Unit,
     viewModel: FacebookViewModel = hiltViewModel(),
-    context: Context, pref: Prefs, onFacebookConnect: () -> Unit,onDisconnec:(String)->Unit,OnConnectionclick:(String,String,String)->Unit
+    context: Context,
+    pref: Prefs,
+    onFacebookConnect: () -> Unit,
+    onInstagramConnect:()->Unit,
+    onDisconnec: (String) -> Unit,
+    OnConnectionclick: (String, String, String) -> Unit
 ) {
 
     val accounts = viewModel.facebookaccounts.collectAsState()
@@ -771,6 +896,7 @@ fun ConnectedAccountsSection(
     // Other social accounts (single entry)
 
     var otherAccounts = listOf(
+        SocialAccount("Telegram"),
         SocialAccount("YouTube")
     )
 
@@ -866,10 +992,7 @@ fun ConnectedAccountsSection(
                                onFacebookConnect()
                             }
                             if(account.platform=="Instagram"){
-                                val userId = pref.getUserID()
-                                val loginUrl = "https://automatedpostingbackend.onrender.com/auth/twitter?userId=${userId}&platform=android"
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
-                                context.startActivity(intent)
+                                onInstagramConnect()
                             }
                             if(account.platform=="Twitter"){
                                 val userId = pref.getUserID()
@@ -883,6 +1006,9 @@ fun ConnectedAccountsSection(
                                 val loginUrl = "https://automatedpostingbackend.onrender.com/auth/linkedin?userId=${userId}&platform=android"
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
                                 context.startActivity(intent)
+                            }
+                            if(account.platform=="Telegram"){
+                                onTelegramDialogChange(true)
                             }
                         }
                     )
@@ -904,6 +1030,19 @@ fun connectFacebook(context: Context, pref: Prefs) {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
     context.startActivity(intent)
 }
+fun connectInstagram(context: Context, pref: Prefs) {
+    val userId = pref.getUserID()
+    Log.d("my id data","---${userId}")
+
+    val loginUrl = "https://www.facebook.com/v20.0/dialog/oauth?" +
+            "client_id=4196581700605802" +
+            "&redirect_uri=https%3A%2F%2Fautomatedpostingbackend.onrender.com%2Fsocial%2Finstagram%2Fcallback" +
+            "&state=${userId}%3Aandroid" +  // inject userId here
+            "&scope=pages_read_engagement,pages_manage_posts,pages_show_list,public_profile,email"
+
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(loginUrl))
+    context.startActivity(intent)
+}
 fun getIcon(platform: String): Int {
     return when (platform.lowercase()) {
         "facebook" -> R.drawable.ic_fb
@@ -911,6 +1050,7 @@ fun getIcon(platform: String): Int {
         "linkedin" -> R.drawable.ic_linkedin
         "twitter" -> R.drawable.ic_twitter
         "youtube" -> R.drawable.ic_youtube
+        "telegram"->R.drawable.ic_telegram
         else -> R.drawable.ic_launcher_foreground // fallback icon
     }
 }
