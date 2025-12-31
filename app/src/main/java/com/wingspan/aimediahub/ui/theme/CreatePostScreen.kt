@@ -85,13 +85,16 @@ import coil.compose.AsyncImage
 import com.wingspan.aimediahub.models.ScheduledPost
 import com.wingspan.aimediahub.R
 import com.wingspan.aimediahub.models.SocialAccount1
+import com.wingspan.aimediahub.ui.theme.nestedcompose.DateAndPlatformRow
 import com.wingspan.aimediahub.utils.Prefs
+import com.wingspan.aimediahub.viewmodel.BlueskyViewModel
 import com.wingspan.aimediahub.viewmodel.FacebookViewModel
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 
 
@@ -111,7 +114,8 @@ import java.time.format.DateTimeFormatter
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: FacebookViewModel= hiltViewModel()) {
+fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: FacebookViewModel= hiltViewModel(),
+                     blueskyViewmodel: BlueskyViewModel=hiltViewModel()) {
 
     val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
 
@@ -218,6 +222,7 @@ fun CreatePostScreen(navController: NavHostController,prefs:Prefs,viewModel: Fac
             onClose = { navController.popBackStack() },
             onContinue = {
                 val message = postText
+                blueskyViewmodel.createPostWithImage(context,message, selectedImageUri)
                 if(!message.isEmpty()){
                     if (currentfbPages.isNotEmpty()) {
                         val uri = selectedImageUri
@@ -482,110 +487,6 @@ fun NewPostTopBar(
 
 
 
-@RequiresApi(Build.VERSION_CODES.O)
-@Composable
-fun DateAndPlatformRow(
-    currentPages: MutableList<SocialAccount1>,
-    onPagesChange: (MutableList<SocialAccount1>) -> Unit,
-    twitterPage: SocialAccount1?,
-    linkedInPage: SocialAccount1?,
-    instagramPage: SocialAccount1?,
-    context: Context,
-    onRemoveTwitter: () -> Unit,
-    onRemoveInstagram: () -> Unit,
-
-) {
-
-    var selectedDateTime by remember {
-        mutableStateOf(LocalDateTime.now())
-    }
-
-    val formatter =
-        DateTimeFormatter.ofPattern("MMM d, yyyy  h:mm a", Locale.ENGLISH)
-
-    val formattedDate = selectedDateTime.format(formatter)
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(14.dp)
-    ) {
-
-
-
-        // ---------------------- DATE & TIME PICKER ----------------------
-        GradientDateTimePickerBox(
-            formattedDate = formattedDate,
-            selectedDateTime = selectedDateTime,
-
-            modifier = Modifier.fillMaxWidth() // optional, set width as needed
-        )
-
-
-
-        Spacer(Modifier.height(12.dp))
-
-        // ---------------------- PLATFORMS ----------------------
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-
-            // FACEBOOK PAGES
-            items(currentPages.size) { index ->
-                val page = currentPages[index]
-                SocialChip(
-                    icon = R.drawable.ic_fb,
-                    iconTint = Color(0xFF1877F2),
-                    imageUrl = page.imageUrl,
-                    label = page.name.toString(),
-                    onRemove = {
-                        val updated =
-                            currentPages.filter { it.id != page.id }.toMutableList()
-                        onPagesChange(updated)
-                    }
-                )
-            }
-
-            // TWITTER
-            twitterPage?.let { tp ->
-                item {
-                    SocialChip(
-                        icon = R.drawable.ic_twitter,
-                        iconTint = Color(0xFF1DA1F2),
-                        imageUrl = tp.imageUrl,
-                        label = tp.name.toString(),
-                        onRemove = onRemoveTwitter
-                    )
-                }
-            }
-            linkedInPage?.let {tp->
-                item {
-                    SocialChip(
-                        icon = R.drawable.ic_linkedin,
-                        iconTint = Color(0xFF1DA1F2),
-                        imageUrl = tp.imageUrl,
-                        label = tp.name.toString(),
-                        onRemove = onRemoveTwitter
-                    )
-                }
-            }
-
-            // INSTAGRAM
-            instagramPage?.let { ip ->
-                item {
-                    SocialChip(
-                        icon = R.drawable.ic_instagram,
-                        iconTint = Color(0xFFDD2A7B),
-                        imageUrl = ip.imageUrl,
-                        label = ip.name.toString(),
-                        onRemove = onRemoveInstagram
-                    )
-                }
-            }
-        }
-    }
-}
 
 
 @Composable
@@ -1008,8 +909,8 @@ fun convertUriToFile(context: Context, uri: Uri): File {
     return file
 }
 
-fun sendTelegramPhoto(imageFile: File) {
 
+fun sendTelegramPhoto(imageFile: File) {
 
     val botToken = "8568025768:AAGd_p5-Bn94cOTco5hMikyCkuC3AO9Tot4" // after revoke
     val chatId = "@mounikaheshu"

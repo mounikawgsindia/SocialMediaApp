@@ -71,7 +71,9 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.ColorFilter
 import com.wingspan.aimediahub.ui.theme.nestedcompose.TelegramConnectDialog
+import com.wingspan.aimediahub.viewmodel.BlueskyViewModel
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -86,7 +88,8 @@ import java.io.IOException
 @SuppressLint("ContextCastToActivity")
 @Composable
 fun HomeScreen( bottomNavController: NavHostController,
-                rootNavController: NavHostController,pref:Prefs,fbDeepLink:String ,twitterDeepLink:String,linkedInDeepLink:String,viewModel: FacebookViewModel =hiltViewModel()) {
+                rootNavController: NavHostController,pref:Prefs,fbDeepLink:String ,twitterDeepLink:String,linkedInDeepLink:String,viewModel: FacebookViewModel =hiltViewModel(),
+                blueskyViewModel: BlueskyViewModel=hiltViewModel()) {
     val scope = rememberCoroutineScope()
     var context= LocalContext.current
     val isLoading by viewModel.fbLoading.collectAsState()
@@ -98,15 +101,27 @@ fun HomeScreen( bottomNavController: NavHostController,
     var telegramUIDialog by remember { mutableStateOf(false) }
     //facebook state
     val fbDisStatus by viewModel.fbDisStatus.collectAsState()
-    val fbPages by viewModel.facebookaccounts.collectAsState()
+
     val fbPagesError by viewModel.facebookError.collectAsState()
-
+    val telegramError by viewModel.telegramError.collectAsState()
     val twitterErrorState by viewModel.twitterError.collectAsState()
+    val telegramProfileStateby by viewModel.telegramProfile.collectAsState()
 
-    LaunchedEffect(fbDisStatus) {
-        fbDisStatus?.let { msg ->
+    LaunchedEffect(telegramProfileStateby) {
+        if (telegramProfileStateby != null) {
+            // ✅ Telegram connected → close dialog
+            telegramUIDialog=false
+        }
+    }
+    LaunchedEffect(telegramError) {
+        telegramError?.let { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
 
+        }
+    }
+    LaunchedEffect(fbPagesError) {
+        fbPagesError?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
         }
     }
     LaunchedEffect(fbPagesError) {
@@ -166,7 +181,9 @@ fun HomeScreen( bottomNavController: NavHostController,
                 // -------------------- TITLE --------------------
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxWidth().clickable{
+                            blueskyViewModel.login()
+                        }
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -289,36 +306,37 @@ fun HomeScreen( bottomNavController: NavHostController,
             onDismiss = { telegramUIDialog=false },
             onConfirm = { groupOrChannel ->
                 Log.d("Telegram", groupOrChannel)
-                    //@momlovesdaughter
-                verifyTelegramChannel(groupOrChannel) { success, message ->
-
-                    if (success) {
-                        Log.d("checking","${message}")
-                        scope.launch {
-                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                        }
-                        telegramUIDialog=false
-                        sendTelegramMessage(groupOrChannel)
-                        getTelegramChatInfo(groupOrChannel) { success, title, username, smallId, bigId, error ->
-
-                            if (success) {
-                                Log.d("Telegram", "Title: $title")
-                                Log.d("Telegram", "Username: $username")
-                                Log.d("Telegram", "Small photo ID: $smallId")
-                                Log.d("Telegram", "Big photo ID: $bigId")
-                            } else {
-                                Log.e("Telegram", "Error: $error")
-                            }
-                        }
-                    } else {
-                        scope.launch {
-                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                        }
-                        Log.e("Telegram","${message}")
-                    }
-                }
-
-
+                viewModel.telegramProfile(groupOrChannel)
+//                    //@momlovesdaughter
+//                verifyTelegramChannel(groupOrChannel) { success, message ->
+//
+//                    if (success) {
+//                        Log.d("checking","${message}")
+//                        scope.launch {
+//                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+//                        }
+//                        telegramUIDialog=false
+//                        sendTelegramMessage(groupOrChannel)
+//                        getTelegramChatInfo(groupOrChannel) { success, title, username, smallId, bigId, error ->
+//
+//                            if (success) {
+//                                Log.d("Telegram", "Title: $title")
+//                                Log.d("Telegram", "Username: $username")
+//                                Log.d("Telegram", "Small photo ID: $smallId")
+//                                Log.d("Telegram", "Big photo ID: $bigId")
+//                            } else {
+//                                Log.e("Telegram", "Error: $error")
+//                            }
+//                        }
+//                    } else {
+//                        scope.launch {
+//                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+//                        }
+//                        Log.e("Telegram","${message}")
+//                    }
+//                }
+//
+//
 
             }
         )
@@ -340,7 +358,10 @@ fun HomeScreen( bottomNavController: NavHostController,
                             viewModel.setTwitterDisconnected()
                         }else if(flatformDisConnect.equals("LinkedIn")){
                             viewModel.setLinkedDisconnected()
+                        }else if(flatformDisConnect.equals("Telegram")){
+                            viewModel.setTelegramDisconnected()
                         }
+
 
                     }
                 ) {
@@ -608,6 +629,22 @@ fun SocialIcon(
                 modifier = Modifier.size(36.dp)
             )
 
+//            Icon(
+//                painter = painterResource(id = icon),
+//                contentDescription = label,
+//                modifier = Modifier.size(30.dp),
+//                tint = if (label.equals("Telegram", ignoreCase = true)) {
+//                    Color.Unspecified // ✅ original color
+//                } else if (label.equals("Facebook", ignoreCase = true)) {
+//                    Color.Unspecified // ✅ original color
+//                } else if (label.equals("Twitter", ignoreCase = true)) {
+//                    Color.Unspecified // ✅ original color
+//                } else if (label.equals("LinkedIn", ignoreCase = true)) {
+//                    Color.Unspecified // ✅ original color
+//                } else {
+//                    Color(0xFF9E9E9E)// grey
+//                }
+//            )
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
@@ -763,11 +800,12 @@ fun ConnectedAccountsSection(
     val twitterData=viewModel.twitterProfile.collectAsState()
     val instagramData =viewModel.instaProfile.collectAsState()
     val linkedInData=viewModel.linkedInProfile.collectAsState()
+    val telegramData=viewModel.telegramProfile.collectAsState()
 
 
     Log.d("data","---${accounts}....${twitterData}")
     val activity = LocalContext.current as MainActivity
-    val callbackManager = activity.callbackManager
+
 
     // ---------------- CREATE LIST OF ACCOUNTS ----------------
     // Facebook pages -> multiple connected accounts
@@ -786,6 +824,18 @@ fun ConnectedAccountsSection(
         SocialAccount(
             id= it.id.toString(),
             platform = "Twitter",
+            connected = true,
+            imageUrl = it.imageUrl,
+            accessToken = it.accessToken
+        )
+    }
+
+    val telegramAccount = telegramData.value?.let {
+        Log.d("telegram","---${it.accessToken}....${it.imageUrl}")
+
+        SocialAccount(
+            id= "0",
+            platform = "Telegram",
             connected = true,
             imageUrl = it.imageUrl,
             accessToken = it.accessToken
@@ -875,6 +925,25 @@ fun ConnectedAccountsSection(
         )
     }
 
+    val telegramDisconnectOnly = if (telegramAccount!= null) {
+        listOf(
+            SocialAccount(
+                id= 0.toString(),
+                platform = "Telegram",
+                connected = true,
+                showDisconnectOnly = true // ✅ special behavior
+            )
+        )
+    } else {
+        listOf(
+            SocialAccount(
+                id= 0.toString(),
+                platform = "Telegram",
+                connected = false
+            )
+        )
+    }
+
     val instaDisconnectOnly = if (instagramAccount!= null) {
         listOf(
             SocialAccount(
@@ -896,15 +965,14 @@ fun ConnectedAccountsSection(
     // Other social accounts (single entry)
 
     var otherAccounts = listOf(
-        SocialAccount("Telegram"),
         SocialAccount("YouTube")
     )
-
+    Log.d("teli","---${telegramAccount}")
     val connectedAccounts = facebookAccounts +
-            listOfNotNull(twitterAccount)+listOfNotNull(linkedInAccount)
-            listOfNotNull(instagramAccount)
+            listOfNotNull(twitterAccount)+listOfNotNull(linkedInAccount)+
+            listOfNotNull(instagramAccount)+listOfNotNull(telegramAccount)
 
-    val nonConnectedAccounts = facebookDisconnectOnly +twitterDisconnectOnly+instaDisconnectOnly+linkedInDisconnectOnly+ otherAccounts
+    val nonConnectedAccounts = facebookDisconnectOnly +twitterDisconnectOnly+instaDisconnectOnly+linkedInDisconnectOnly+telegramDisconnectOnly+ otherAccounts
 
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -924,13 +992,14 @@ fun ConnectedAccountsSection(
             ) {
                 items(connectedAccounts.size) { index ->
                     var account = connectedAccounts[index]
+                    Log.d("TAG", "Page ID: ${connectedAccounts.size}")
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xFFE7F0FF))
                             .clickable{
-                                Log.d("TAG", "Page ID: $account.id")
+
                                 OnConnectionclick(account.platform,account.id,
                                     account.accessToken.toString()
                                 )
@@ -954,6 +1023,16 @@ fun ConnectedAccountsSection(
                                     .size(30.dp)
                                     .clip(CircleShape)
                             )
+                        }else{
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_profile),
+                                contentDescription = "Default avatar",
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape),
+                                colorFilter = ColorFilter.tint(Color.Gray)
+                            )
+
                         }
                     }
                 }
@@ -983,6 +1062,8 @@ fun ConnectedAccountsSection(
                             }else if(account.platform=="Instagram"){
                                 logoutInstagram(viewModel)
                             }else if(account.platform=="LinkedIn"){
+                                onDisconnec(account.platform.toString())
+                            }else if(account.platform=="Telegram"){
                                 onDisconnec(account.platform.toString())
                             }
                         },

@@ -17,9 +17,10 @@ import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.inject.Inject
+import javax.inject.Named
 
 class ChatRepository @Inject constructor(
-    private val apiService: ApiServices
+    @Named("Backend")private val apiService: ApiServices
 ) {
 
     fun sendMessage(request: AITextRequest): Flow<Resource<ChatMessage>> = flow {

@@ -17,6 +17,7 @@ import com.wingspan.aimediahub.models.LongLivedTokenResponse
 import com.wingspan.aimediahub.models.Post
 import com.wingspan.aimediahub.models.PostBodyRequest
 import com.wingspan.aimediahub.models.SocialAccount1
+import com.wingspan.aimediahub.models.TelegramRequest
 import com.wingspan.aimediahub.models.TweetResponse
 import com.wingspan.aimediahub.repository.FacebookRepository
 import com.wingspan.aimediahub.utils.Prefs
@@ -102,11 +103,17 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
     val userProfileLiveData = MutableLiveData<InstagramUserResponse>()
     val errorLiveData = MutableLiveData<String>()
 
+    //linkedIn
+    private val _telegramProfile = MutableStateFlow<SocialAccount1?>(null)
+    val telegramProfile: StateFlow<SocialAccount1?> = _telegramProfile
+    private val _telegramError = MutableStateFlow<String?>(null)
+    val telegramError: StateFlow<String?> = _telegramError
+
     init {
         _facebookaccounts.value = prefs.getFacebookPages()
         _twitterProfile.value = prefs.getTwitterAccount()
         _linkedInProfile.value=prefs.getLinkedInAccount()
-
+        _telegramProfile.value=prefs.getTelegramAccount()
         _instaProfile.value = prefs.getInstaAccount()
         Log.d("twitter viewmodel", "${prefs.getTwitterAccount()}")
     }
@@ -386,34 +393,7 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
         }
     }
 
-//    fun publishLinkedInPost(
-//        pageId: String,
-//        message: String,
-//        sheduleTime: String,
-//        imageUri: Uri?
-//    ) {
-//        viewModelScope.launch {
-//
-//            // ✅ reset before API so old success doesn't re-trigger
-//            _linkedInpostStatus.value = null
-//
-//            var request=PostBodyRequest(prefs.getUserID().toString(),message)
-//
-//            repository.publishFacebookPost(request).collect { resource ->
-//                when (resource) {
-//                    is Resource.Loading -> {}
-//
-//                    is Resource.Success -> {
-//                        _linkedInpostStatus.value = resource.data?.success
-//                    }
-//
-//                    is Resource.Error -> {
-//                        _linkedInpostStatus.value = false
-//                    }
-//                }
-//            }
-//        }
-//    }
+
 
     fun setLinkedDisconnected() {
         viewModelScope.launch {
@@ -437,6 +417,49 @@ class FacebookViewModel @Inject constructor(@ApplicationContext private val  con
         }
 
     }
+    fun setTelegramDisconnected () {
+
+        prefs.clearTelegramAccounts()
+        _telegramProfile.value = null
+
+    }
+
+        //telegram
+
+    fun telegramProfile(chatName:String) {
+        var request= TelegramRequest(prefs.getUserID(),chatName)
+        Log.d("telegram in request", "$request")
+        viewModelScope.launch {
+            repository.telegramProfile(request).collect { resource ->
+                when (resource) {
+                    is Resource.Loading -> {
+
+                    }
+                    is Resource.Success -> {
+
+                        resource.data?.data?.let{
+                            val socialAccounts= SocialAccount1(
+                                id = "",
+                                name =it.meta.username.toString(),
+                                accessToken = it.accessToken.toString(),
+                                imageUrl ="" ,
+                                platform ="telegram"
+                            )
+                            _telegramProfile.value=socialAccounts
+                            prefs.saveTelegramAccounts(socialAccounts)
+                        }
+                        Log.d("telegram in profile", resource.data?.data?.meta!!.username)
+                    }
+                    is Resource.Error -> {
+                        // Error already comes from repository
+                        _telegramError.value = resource.message?: "Unknown error"
+                        Log.e("telegram in profile", resource.message ?: "Unknown error")
+                    }
+                }
+            }
+        }
+    }
+
 
     fun setInstagramDisconnected() {
         prefs.clearTwitterAccounts()

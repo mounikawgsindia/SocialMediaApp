@@ -1,5 +1,6 @@
 package com.wingspan.aimediahub.viewmodel
 
+import android.annotation.SuppressLint
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -97,6 +98,7 @@ open class AuthViewModel  @Inject constructor(private val repository: AuthReposi
         }
     }
 
+    @SuppressLint("SuspiciousIndentation")
     fun loginValidate(): Boolean{
 
      var isValid = true

@@ -13,6 +13,8 @@ import com.wingspan.aimediahub.models.PostsResponse
 import com.wingspan.aimediahub.models.PublishPostResponse
 import com.wingspan.aimediahub.models.RegisterRequest
 import com.wingspan.aimediahub.models.ResponseData
+import com.wingspan.aimediahub.models.TelegramRequest
+import com.wingspan.aimediahub.models.TelegramResponse
 import com.wingspan.aimediahub.models.TwitterConnectResponse
 import com.wingspan.aimediahub.models.TwitterPostResponse
 import okhttp3.MultipartBody
@@ -112,4 +114,11 @@ interface ApiServices {
 
     @POST("api/linkedin/post")
     suspend fun linkedInPost(@Body request:PostBodyRequest): Response<TwitterPostResponse>
+
+
+    //telegram
+    @POST("telegram/connect")
+    suspend fun telegramProfile(
+        @Body request: TelegramRequest
+    ): Response<TelegramResponse>
 }

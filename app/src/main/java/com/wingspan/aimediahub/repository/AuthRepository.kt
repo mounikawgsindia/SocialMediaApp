@@ -16,18 +16,19 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import okhttp3.internal.concurrent.TaskRunner.Backend
 import org.json.JSONObject
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
 import javax.inject.Inject
+import javax.inject.Named
 import kotlin.io.readText
 import kotlin.let
 import kotlin.toString
 
- class AuthRepository @Inject constructor(
-    private val apiService: ApiServices
+ class AuthRepository @Inject constructor(@Named("Backend") private val apiService: ApiServices
 ) {
 
      /**

@@ -86,6 +86,11 @@ class Prefs @Inject constructor(@ApplicationContext private val  context: Contex
         prefs.edit() { putString("LinkedIn_Account", json) }
     }
 
+    fun saveTelegramAccounts(accounts: SocialAccount1) {
+        val json = gson.toJson(accounts)
+        prefs.edit() { putString("Telegram_Account", json) }
+    }
+
     fun saveInstagramAccounts(accounts: SocialAccount1) {
         val json = gson.toJson(accounts)
         prefs.edit() { putString("Insta_Account", json) }
@@ -111,7 +116,10 @@ class Prefs @Inject constructor(@ApplicationContext private val  context: Contex
         val json = prefs.getString("LinkedIn_Account", null)
         return if (!json.isNullOrEmpty()) gson.fromJson(json, SocialAccount1::class.java) else null
     }
-
+    fun getTelegramAccount(): SocialAccount1? {
+        val json = prefs.getString("Telegram_Account", null)
+        return if (!json.isNullOrEmpty()) gson.fromJson(json, SocialAccount1::class.java) else null
+    }
 
     fun getInstaAccount(): SocialAccount1? {
         val json = prefs.getString("Insta_Account", null)
@@ -142,6 +150,12 @@ class Prefs @Inject constructor(@ApplicationContext private val  context: Contex
     fun clearLinkedInAccounts() {
         prefs.edit().apply {
             remove("LinkedIn_Account")
+            apply()
+        }
+    }
+    fun clearTelegramAccounts() {
+        prefs.edit().apply {
+            remove("Telegram_Account")
             apply()
         }
     }

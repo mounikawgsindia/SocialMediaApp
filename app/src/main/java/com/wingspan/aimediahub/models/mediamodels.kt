@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.Color
 import com.google.gson.annotations.SerializedName
 import com.wingspan.aimediahub.ui.theme.Sender
 import kotlinx.parcelize.Parcelize
+import java.util.Date
 
 data class OnBoardModel(
     val image: Int,
@@ -233,3 +234,97 @@ data class Post(
     val __v: Int
 ): Parcelable
 
+data class BlueskyLoginRequest(
+    val identifier: String,
+    val password: String
+)
+
+data class BlueskyLoginResponse(
+    val accessJwt: String,
+    val refreshJwt: String,
+    val did: String,
+    val handle: String
+)
+data class BlueskyProfileResponse(
+    val did: String,
+    val handle: String,
+    val displayName: String?,
+    val description: String?,
+    val avatar: String?
+)
+data class BlueskyPostRequest(
+    val text: String,
+    val createdAt: String? = null,
+    val embed: BlueskyEmbed? = null
+)
+data class CreateRecordRequest(
+    val repo: String,
+    val collection: String,
+    val record: BlueskyPostRecord
+)
+data class BlueskyPostRecord(
+    val text: String,
+    val createdAt: String,
+    val embed: BlueskyEmbed? = null
+)
+
+data class BlueskyEmbed(
+    @SerializedName("\$type") // Maps Kotlin property to "$type" in JSON
+    val type: String,         // "app.bsky.embed.images" or "app.bsky.embed.record"
+    val images: List<BlueskyImage>? = null
+)
+
+data class BlueskyImage(
+    val image: BlueskyBlobRef,      // CID from uploadBlob
+    val alt: String? = null
+)
+
+
+
+data class BlueskyPostResponse(
+    val uri: String,
+    val cid: String,
+    val author: String
+)
+
+data class BlueskyUploadResponse(
+    val blob: BlueskyBlob
+)
+
+data class BlueskyBlob(
+    val ref: BlueskyBlobRef,
+    val mimeType: String,
+    val size: Int,
+)
+
+data class BlueskyBlobRef(
+    @SerializedName("\$link")
+    val link: String
+)
+data class TelegramRequest(var userId:String?,val chatName:String?)
+data class TelegramResponse(
+    val success: Boolean,
+    val message: String,
+    val data: TelegramData
+)
+
+data class TelegramData(
+    @SerializedName("_id")
+    val id: String,
+    val providerId: String,
+    val user: String,
+    val platform: String,
+    @SerializedName("__v")
+    val v: Int,
+    val accessToken: String,
+    val connectedFrom: String,
+    val createdAt: Date,
+    val meta: Meta,
+    val scopes: List<String>
+)
+
+data class Meta(
+    val username: String,
+    val isAdmin: Boolean,
+    val verifiedAt: Date
+)

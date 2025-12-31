@@ -8,6 +8,8 @@ import com.wingspan.aimediahub.models.PageResponse
 import com.wingspan.aimediahub.models.PostsResponse
 import com.wingspan.aimediahub.models.PublishPostResponse
 import com.wingspan.aimediahub.models.ResponseData
+import com.wingspan.aimediahub.models.TelegramRequest
+import com.wingspan.aimediahub.models.TelegramResponse
 import com.wingspan.aimediahub.models.TwitterConnectResponse
 import com.wingspan.aimediahub.networks.ApiServices
 import com.wingspan.aimediahub.utils.Prefs
@@ -27,8 +29,10 @@ import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.inject.Inject
+import javax.inject.Named
 
-class FacebookRepository @Inject constructor(private val apiCall:ApiServices,
+class FacebookRepository @Inject constructor(@Named("Backend")private val apiCall:ApiServices,
+                                             @Named("BackendV2")private val api2call: ApiServices,
    val pref:Prefs
 ) {
 
@@ -170,12 +174,12 @@ class FacebookRepository @Inject constructor(private val apiCall:ApiServices,
             errorKey = "message"
         )
 
-    //post
-//    fun linkedInPost(): Flow<Resource<LinkedInProfileResponse>> =
-//        safeApiCall(
-//            apiCall = { apiCall.linkedInPost(pref.getUserID().toString()) },
-//            errorKey = "message"
-//        )
+    //telegram
+    fun telegramProfile(request:TelegramRequest): Flow<Resource<TelegramResponse>> =
+        safeApiCall(
+            apiCall = { api2call.telegramProfile(request) },
+            errorKey = "message"
+        )
 
 
     /**
@@ -202,13 +206,21 @@ class FacebookRepository @Inject constructor(private val apiCall:ApiServices,
             val errorMsg = response.errorBody()?.let {
                 val errorStr = it.charStream().readText()
                 Log.e("API_ERROR", errorStr)
+
                 try {
-                    JSONObject(errorStr).optString(errorKey, "Something went wrong")
+                    val json = JSONObject(errorStr)
+
+                    // Priority-based error resolution
+                    when {
+                        json.has("telegramError") -> json.optString("telegramError")
+                        json.has("error") -> json.optString("error")
+                        json.has(errorKey) -> json.optString(errorKey)
+                        else -> "Something went wrong"
+                    }
                 } catch (e: Exception) {
                     "Something went wrong"
                 }
             } ?: "Something went wrong"
-
             emit(Resource.Error(errorMsg))
         }
 
